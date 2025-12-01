@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.7] - 2025-12-01
+
+### Added
+
+- Polygonized contour cache to avoid redundant curve subdivision
+- Generic LRU cache in `src/utils/LRUCache.ts`
+- Integration tests with real HarfBuzz and fonts
+- `npm run benchmark` command for performance measurement
+
+### Changed
+
+- Contour polygonization now cached per glyph, reducing redundant work by ~93%
+- Performance logging now includes `reset()` method for benchmark scenarios
+
 ## [0.2.6] - 2025-12-01
 
 ### Added

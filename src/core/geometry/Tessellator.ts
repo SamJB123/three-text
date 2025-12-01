@@ -1,6 +1,7 @@
 import type { Path, ProcessedGeometry } from '../types';
 import * as libtess from 'libtess';
 import { logger } from '../../utils/Logger';
+import { perfLogger } from '../../utils/PerformanceLogger';
 
 export class Tessellator {
   public process(
@@ -41,7 +42,12 @@ export class Tessellator {
       logger.log('Two-pass: boundary extraction then triangulation');
 
       // Extract boundaries to remove overlaps
+      perfLogger.start('Tessellator.boundaryPass', {
+        contourCount: contours.length
+      });
       const boundaryResult = this.performTessellation(contours, 'boundary');
+      perfLogger.end('Tessellator.boundaryPass');
+
       if (!boundaryResult) {
         logger.warn('libtess returned empty result from boundary pass');
         return { triangles: { vertices: [], indices: [] }, contours: [] };
@@ -57,7 +63,11 @@ export class Tessellator {
     }
 
     // Triangulate the contours
+    perfLogger.start('Tessellator.triangulationPass', {
+      contourCount: contours.length
+    });
     const triangleResult = this.performTessellation(contours, 'triangles');
+    perfLogger.end('Tessellator.triangulationPass');
     if (!triangleResult) {
       const warning = removeOverlaps
         ? 'libtess returned empty result from triangulation pass'

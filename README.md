@@ -15,7 +15,7 @@ A high fidelity 3D font renderer and text layout engine for the web
 > [!CAUTION]
 > three-text is an alpha release and the API may break rapidly. This warning will last at least through the end of 2025. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
-**three-text** renders and formats text from TTF, OTF, and WOFF font files as 3D geometry. It uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly, caching their geometries for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate
+**three-text** renders and formats text from TTF, OTF, and WOFF font files as 3D geometry. It uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly. Glyph geometry is cached for low CPU overhead, especially in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate
 
 The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
@@ -243,7 +243,7 @@ Existing solutions take different approaches:
 - **three-bmfont-text** is a 2D approach for Three.js, using pre-rendered bitmap fonts with SDF support. Texture atlases are generated at specific sizes, and artifacts are apparent up close
 - **troika-three-text** uses MSDF, which improves quality, and like three-text, it is built on HarfBuzz, which provides substantial language coverage, but is ultimately a 2D technique in image space. For flat text that does not need formatting or extrusion, and where artifacts are acceptable up close, troika works well
 
-three-text generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than bitmap approaches when flat, and produces real mesh data that can be used with any rendering system. The library caches tessellated glyphs, so a paragraph of 1000 words might only require 50 tessellations depending on the language. This makes it well-suited to longer texts. In addition to performance considerations, three-text provides control over typesetting and paragraph justification via TeX-based parameters
+three-text generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than bitmap approaches when flat, and produces real mesh data that can be used with any rendering system. The library caches glyph geometry, so a paragraph of 1000 words might only require 50 unique glyphs to be processed. This makes it well-suited to longer texts. In addition to performance considerations, three-text provides control over typesetting and paragraph justification via TeX-based parameters
 
 ## Library structure
 
@@ -298,7 +298,7 @@ Hyphenation uses patterns derived from the Tex hyphenation project, converted in
 
 ### Geometry generation and optimization
 
-To optimize performance, three-text generates the geometry for each unique glyph or glyph cluster only once. The result is stored in a cache for reuse. This initial geometry creation is a multi-stage pipeline:
+The geometry pipeline runs once per unique glyph (or glyph cluster), with intermediate results cached to avoid redundant work:
 
 1. **Path collection**: HarfBuzz callbacks provide low level drawing operations
 2. **Curve polygonization**: Uses Anti-Grain Geometry's recursive subdivision to convert bezier curves into polygons, concentrating points where curvature is high
@@ -315,7 +315,7 @@ The multi-stage geometry approach (curve polygonization followed by cleanup, the
 
 The library uses a hybrid caching strategy to maximize performance while ensuring visual correctness
 
-By default, it operates with glyph-level cache. The geometry for each unique character (`a`, `b`, `c`...) is generated only once and stored for reuse to avoiding redundant computation
+By default, it operates with glyph-level cache. The geometry for each unique character (`a`, `b`, `c`...) is generated only once and stored for reuse, avoiding redundant computation
 
 For text with tight tracking, connected scripts, or complex kerning pairs, individual glyphs can overlap. When an overlap within a word is found, the entire word is treated as a single unit and escalated to a word-level cache. All of its glyphs are tessellated together to correctly resolve the overlaps, and the resulting geometry for the word is cached
 
@@ -957,6 +957,23 @@ npm test -- --coverage # Coverage report
 ```
 
 Tests use mocked HarfBuzz and tessellation libraries for fast execution without requiring WASM files
+
+### Benchmarking
+
+For performance of the real pipeline using HarfBuzz, including shaping, layout, tessellation, extrusion, there is a dedicated benchmark:
+
+```bash
+npm run benchmark
+```
+
+This runs a Node/Vitest scenario that:
+
+- initializes HarfBuzz from `hb.wasm` via `Text.setHarfBuzzBuffer`
+- loads Nimbus Sans and tests the example paragraph from the demos
+- performs a small number of cold runs followed by warm runs of `Text.create()` with justification and hyphenation enabled
+- prints a per-stage timing table (font load, line breaking, polygonization, tessellation, extrusion, and overall geometry creation)
+
+Use this to compare changes locally; it is meant as a sanity check on real work rather than a reliable micro-benchmark
 
 ## Build system
 
