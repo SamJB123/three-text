@@ -7,13 +7,11 @@ import enUs from '../src/hyphenation/en-us';
 
 const require = createRequire(import.meta.url);
 
-// Same default paragraph used in the interactive examples and React demo
 const EXAMPLE_TEXT = `three-text renders and formats text from TTF, OTF, and WOFF font files as 3D geometry. It uses Tex-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly, caching their geometries for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for removing overlaps and triangulation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`;
 
 let fontBuffer: ArrayBuffer;
 
 beforeAll(async () => {
-  // Load real hb.wasm from node_modules and configure Text to use it via buffer
   const hbWasmPath = require.resolve('../node_modules/harfbuzzjs/hb.wasm');
   const hbNodeBuffer = fs.readFileSync(hbWasmPath);
   const hbArrayBuffer = hbNodeBuffer.buffer.slice(
@@ -22,7 +20,6 @@ beforeAll(async () => {
   );
   Text.setHarfBuzzBuffer(hbArrayBuffer);
 
-  // Load the Nimbus font used by the examples
   const fontPath = require.resolve('../examples/fonts/NimbusSanL-Reg.woff');
   const fontNodeBuffer = fs.readFileSync(fontPath);
   fontBuffer = fontNodeBuffer.buffer.slice(
@@ -34,7 +31,6 @@ beforeAll(async () => {
   Text.registerPattern('en-us', enUs);
 });
 
-// Only run this perf-heavy test when explicitly requested
 describe.runIf(process.env.THREE_TEXT_LOG === 'true')(
   'Pipeline perf with example text (real HarfBuzz + real font)',
   () => {

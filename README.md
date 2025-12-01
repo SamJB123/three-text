@@ -973,7 +973,7 @@ This runs a Node/Vitest scenario that:
 - performs a small number of cold runs followed by warm runs of `Text.create()` with justification and hyphenation enabled
 - prints a per-stage timing table (font load, line breaking, polygonization, tessellation, extrusion, and overall geometry creation)
 
-Use this to compare changes locally; it is meant as a sanity check on real work rather than a synthetic micro-benchmark.
+Use this to compare changes locally; it is meant as a sanity check on real work rather than a reliable micro-benchmark
 
 ## Build system
 
