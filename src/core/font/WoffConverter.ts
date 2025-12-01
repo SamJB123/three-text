@@ -1,4 +1,4 @@
-import { debugLogger } from '../../utils/DebugLogger';
+import { logger } from '../../utils/Logger';
 import { FONT_SIGNATURE_WOFF, FONT_SIGNATURE_WOFF2 } from './constants';
 
 // Uses DecompressionStream to decompress WOFF (WOFF is just zlib compressed TTF/OTF so we can use deflate)
@@ -143,7 +143,7 @@ export class WoffConverter {
       sfntOffset += padding;
     }
 
-    debugLogger.log('WOFF font decompressed successfully');
+    logger.log('WOFF font decompressed successfully');
     return sfntData.buffer.slice(0, sfntOffset);
   }
 

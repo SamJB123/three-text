@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { useControls, button, monitor } from "leva";
+import { useControls, button, monitor, folder } from "leva";
 import * as THREE from "three";
 import { Text } from "three-text/three/react";
 import FontDropzone from "./components/FontDropzone";
@@ -22,6 +22,8 @@ import waveFragmentShader from "./shaders/wave.frag?raw";
 import offVertexShader from "./shaders/off.vert?raw";
 
 Text.setHarfBuzzPath("/hb/hb.wasm");
+
+const DEFAULT_TEXT = `three-text renders and formats text from TTF, OTF, and WOFF font files as 3D geometry. It uses Tex-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly, caching their geometries for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for removing overlaps and triangulation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`;
 
 function AnimationUpdater({ meshRef, animationMode, waveControls, flipControls, explodeControls, orbitControls, twisterControls }) {
   useFrame((state) => {
@@ -62,6 +64,9 @@ function App() {
   const [currentFontName, setCurrentFontName] = useState("Nimbus Sans");
   const [variationAxes, setVariationAxes] = useState(null);
   const [fontVariations, setFontVariations] = useState({});
+  const [availableFeatures, setAvailableFeatures] = useState(null);
+  const [featureNames, setFeatureNames] = useState({});
+  const [fontFeatures, setFontFeatures] = useState({});
   const textMeshRef = useRef();
   const renderStartTimeRef = useRef(null);
 
@@ -76,8 +81,8 @@ function App() {
       font: fontBuffer,
       size: 12
     });
-    const axes = tempResult.getLoadedFont()?.variationAxes || null;
-    
+    const loadedFont = tempResult.getLoadedFont();
+    const axes = loadedFont?.variationAxes || null;
     
     // Always update axes state (this will be null for non-variable fonts)
     setVariationAxes(axes);
@@ -90,6 +95,25 @@ function App() {
       }
     }
     setFontVariations(defaultVariations);
+    
+    // Extract available OpenType features
+    const features = loadedFont?.availableFeatures || null;
+    const names = loadedFont?.featureNames || {};
+    setAvailableFeatures(features);
+    setFeatureNames(names);
+    
+    // Reset features to defaults
+    const defaultFeatures = {};
+    // HarfBuzz default-on features (horizontal text)
+    const defaultEnabled = ['abvm', 'blwm', 'ccmp', 'locl', 'mark', 'mkmk', 'rlig', 'calt', 'clig', 'curs', 'dist', 'kern', 'liga', 'rclt'];
+    if (features) {
+      features.forEach(tag => {
+        if (defaultEnabled.includes(tag)) {
+          defaultFeatures[tag] = true;
+        }
+      });
+    }
+    setFontFeatures(defaultFeatures);
   };
 
   const handleUploadClick = useCallback(() => {
@@ -126,17 +150,104 @@ function App() {
     setFontControl({ "Current font": currentFontName });
   }, [currentFontName]);
 
-  const textControls = useControls("Text", {
-    text: {
-      value:
-        `three-text renders and formats text from TTF, OTF, and WOFF font files as 3D geometry. It uses Tex-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly, caching their geometries for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for removing overlaps and triangulation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`,
-      rows: true,
+  useEffect(() => {
+    const detectDefaultFontFeatures = async () => {
+      const tempResult = await Text.create({
+        text: "temp",
+        font: "./fonts/NimbusSanL-Reg.woff",
+        size: 12
+      });
+      const loadedFont = tempResult.getLoadedFont();
+      const features = loadedFont?.availableFeatures || null;
+      const names = loadedFont?.featureNames || {};
+      
+      if (features && features.length > 0) {
+        setAvailableFeatures(features);
+        setFeatureNames(names);
+        
+        // Initialize default features
+        // HarfBuzz default-on features (horizontal text)
+    const defaultEnabled = ['abvm', 'blwm', 'ccmp', 'locl', 'mark', 'mkmk', 'rlig', 'calt', 'clig', 'curs', 'dist', 'kern', 'liga', 'rclt'];
+        const defaults = {};
+        features.forEach(tag => {
+          if (defaultEnabled.includes(tag)) {
+            defaults[tag] = true;
+          }
+        });
+        setFontFeatures(defaults);
+      }
+    };
+    
+    detectDefaultFontFeatures();
+  }, []);
+
+  const [textControls] = useControls(
+    "Text",
+    () => {
+      const config = {
+        text: {
+          value: DEFAULT_TEXT,
+          rows: true,
+        },
+        fontSize: { value: 72, min: 30, max: 150, step: 5 },
+        letterSpacing: { value: 0, min: -0.1, max: 0.2, step: 0.01 },
+        direction: { value: "ltr", options: ["ltr", "rtl"] },
+        depth: { value: 7, min: 0, max: 50, step: 1 },
+      };
+
+      if (!availableFeatures || !Array.isArray(availableFeatures) || availableFeatures.length === 0) {
+        config["OpenType features"] = folder(
+          {
+            "No features": { value: "None detected", editable: false },
+          },
+          { collapsed: true }
+        );
+      } else {
+        const defaultEnabled = new Set([
+          "abvm",
+          "blwm",
+          "ccmp",
+          "locl",
+          "mark",
+          "mkmk",
+          "rlig",
+          "calt",
+          "clig",
+          "curs",
+          "dist",
+          "kern",
+          "liga",
+          "rclt",
+        ]);
+
+        const featureControls = {};
+        for (const tag of availableFeatures) {
+          // For stylistic sets / character variants, keep tag prefix (ss01, cv01) in the label
+          let label = featureNames[tag] || tag;
+          if (/^(ss|cv)\d{2}$/.test(tag) && featureNames[tag]) {
+            label = `${tag}: ${featureNames[tag]}`;
+          }
+
+          featureControls[label] = {
+            value:
+              fontFeatures[tag] !== undefined
+                ? fontFeatures[tag]
+                : defaultEnabled.has(tag),
+            onChange: (value) => {
+              setFontFeatures((prev) => ({ ...prev, [tag]: value }));
+            },
+          };
+        }
+
+        config["OpenType features"] = folder(featureControls, {
+          collapsed: true,
+        });
+      }
+
+      return config;
     },
-    fontSize: { value: 72, min: 30, max: 150, step: 5 },
-    letterSpacing: { value: 0, min: -0.1, max: 0.2, step: 0.01 },
-    direction: { value: "ltr", options: ["ltr", "rtl"] },
-    depth: { value: 7, min: 0, max: 50, step: 1 },
-  });
+    [availableFeatures, featureNames, fontFeatures]
+  );
 
   const lineBreakingControls = useControls("Line breaking", {
     lineWidth: { value: 1400, min: 500, max: 3000, step: 10 },
@@ -417,11 +528,12 @@ function App() {
       />
 
       <VariableFontControls
-        key={variationAxes ? Object.keys(variationAxes).join('-') : 'none'}
+        key={variationAxes ? `axes-${Object.keys(variationAxes).join('-')}` : 'no-axes'}
         axes={variationAxes}
         variations={fontVariations}
         onVariationsChange={setFontVariations}
       />
+
 
       <Canvas
         camera={{
@@ -491,6 +603,7 @@ function App() {
             doublehyphendemerits: hyphenationControls.doublehyphendemerits,
           }}
           fontVariations={fontVariations}
+          fontFeatures={fontFeatures}
           material={material}
           rotation={[0, 0.5, 0]}
           onLoad={(geometry, info) => {
@@ -513,7 +626,7 @@ function App() {
           }}
           onError={handleError}
         >
-          {textControls.text}
+          {textControls.text || DEFAULT_TEXT}
         </Text>
 
         <OrbitControls

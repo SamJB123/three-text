@@ -274,8 +274,11 @@
         let customFontBuffer = null;
         let currentFontName = "NimbusSanL-Reg.woff";
         let variableFontControllers = [];
+        let featureControllers = [];
+        let featuresFolder = null;
         let currentShaderMode = 'wave';
         let shaderFolders = {};
+        let lastFontBuffer = null;
          
 
         const params = {
@@ -1206,6 +1209,14 @@
                 fontVariations[tag] = params[key];
               }
             }
+            
+            const fontFeatures = {};
+            for (const key in params) {
+              if (key.startsWith('fontFeat_')) {
+                const tag = key.replace('fontFeat_', '');
+                fontFeatures[tag] = params[key];
+              }
+            }
 
             let font;
             if (customFontBuffer) {
@@ -1225,6 +1236,7 @@
               lineHeight: params.lineHeight,
               letterSpacing: params.letterSpacing,
               fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
+              fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
               removeOverlaps: params.removeOverlaps,
               separateGlyphsWithAttributes: needsGlyphAttributes,
               curveFidelity: {
@@ -1261,9 +1273,25 @@
             });
 
             const loadedFont = result.getLoadedFont();
-            const axes = loadedFont?.variationAxes || null;
-            if (customFontBuffer && axes) {
-              addVariableFontControls(axes, textFolder);
+            
+            // Only rebuild controls when font changes
+            const currentFontBuffer = customFontBuffer || "./fonts/NimbusSanL-Reg.woff";
+            if (lastFontBuffer !== currentFontBuffer) {
+              lastFontBuffer = currentFontBuffer;
+              
+              clearVariableFontControls();
+              clearFeatureControls();
+              
+              const axes = loadedFont?.variationAxes || null;
+              if (customFontBuffer && axes) {
+                addVariableFontControls(axes, textFolder);
+              }
+              
+              const features = loadedFont?.availableFeatures || null;
+            const featureNames = loadedFont?.featureNames || {};
+            if (features && features.length > 0) {
+              addOpenTypeFeatureControls(features, featureNames, textFolder);
+            }
             }
 
             if (textMesh) {
@@ -1481,6 +1509,18 @@
           });
           variableFontControllers = [];
         }
+        
+        function clearFeatureControls() {
+          featureControllers.forEach(controller => {
+            controller.destroy();
+          });
+          featureControllers = [];
+          
+          if (featuresFolder) {
+            featuresFolder.destroy();
+            featuresFolder = null;
+          }
+        }
 
         function addVariableFontControls(axes, textFolder) {
           clearVariableFontControls();
@@ -1502,6 +1542,75 @@
               });
               
             variableFontControllers.push(controller);
+          }
+        }
+        
+        function addOpenTypeFeatureControls(features, featureNames, textFolder) {
+          clearFeatureControls();
+          
+          if (!features || features.length === 0) return;
+          
+          featuresFolder = textFolder.addFolder("OpenType features");
+          featuresFolder.close();
+          
+          // Features typically enabled by default
+          // HarfBuzz default-on features (horizontal text)
+          const defaultEnabled = new Set(['abvm', 'blwm', 'ccmp', 'locl', 'mark', 'mkmk', 'rlig', 'calt', 'clig', 'curs', 'dist', 'kern', 'liga', 'rclt']);
+          
+          const common = features.filter(f => ['liga', 'kern', 'calt', 'clig', 'dlig', 'smcp', 'onum', 'lnum', 'tnum', 'pnum'].includes(f));
+          const stylistic = features.filter(f => /^ss\d{2}$/.test(f)).sort();
+          const variants = features.filter(f => /^cv\d{2}$/.test(f)).sort();
+          
+          // Common features
+          for (const tag of common) {
+            params[`fontFeat_${tag}`] = defaultEnabled.has(tag);
+            
+            const controller = featuresFolder
+              .add(params, `fontFeat_${tag}`)
+              .name(tag)
+              .onChange(() => {
+                renderText();
+              });
+              
+            featureControllers.push(controller);
+          }
+          
+          // Stylistic sets
+          for (const tag of stylistic) {
+            params[`fontFeat_${tag}`] = false;
+            
+            let displayName = featureNames[tag] || tag;
+            if (/^(ss|cv)\d{2}$/.test(tag) && featureNames[tag]) {
+              displayName = `${tag}: ${featureNames[tag]}`;
+            }
+
+            const controller = featuresFolder
+              .add(params, `fontFeat_${tag}`)
+              .name(displayName)
+              .onChange(() => {
+                renderText();
+              });
+              
+            featureControllers.push(controller);
+          }
+          
+          // Character variants
+          for (const tag of variants) {
+            params[`fontFeat_${tag}`] = false;
+            
+            let displayName = featureNames[tag] || tag;
+            if (/^(ss|cv)\d{2}$/.test(tag) && featureNames[tag]) {
+              displayName = `${tag}: ${featureNames[tag]}`;
+            }
+
+            const controller = featuresFolder
+              .add(params, `fontFeat_${tag}`)
+              .name(displayName)
+              .onChange(() => {
+                renderText();
+              });
+              
+            featureControllers.push(controller);
           }
         }
 

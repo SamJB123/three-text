@@ -1,6 +1,6 @@
 import type { Path, ProcessedGeometry } from '../types';
 import * as libtess from 'libtess';
-import { debugLogger } from '../../utils/DebugLogger';
+import { logger } from '../../utils/Logger';
 
 export class Tessellator {
   public process(
@@ -17,7 +17,7 @@ export class Tessellator {
       return { triangles: { vertices: [], indices: [] }, contours: [] };
     }
 
-    debugLogger.log(
+    logger.log(
       `Tessellator: removeOverlaps=${removeOverlaps}, processing ${valid.length} paths`
     );
 
@@ -38,22 +38,22 @@ export class Tessellator {
     let contours = this.pathsToContours(normalizedPaths);
 
     if (removeOverlaps) {
-      debugLogger.log('Two-pass: boundary extraction then triangulation');
+      logger.log('Two-pass: boundary extraction then triangulation');
 
       // Extract boundaries to remove overlaps
       const boundaryResult = this.performTessellation(contours, 'boundary');
       if (!boundaryResult) {
-        debugLogger.warn('libtess returned empty result from boundary pass');
+        logger.warn('libtess returned empty result from boundary pass');
         return { triangles: { vertices: [], indices: [] }, contours: [] };
       }
 
       // Convert boundary elements back to contours
       contours = this.boundaryToContours(boundaryResult);
-      debugLogger.log(
+      logger.log(
         `Boundary pass created ${contours.length} contours. Starting triangulation pass.`
       );
     } else {
-      debugLogger.log(`Single-pass triangulation for ${isCFF ? 'CFF' : 'TTF'}`);
+      logger.log(`Single-pass triangulation for ${isCFF ? 'CFF' : 'TTF'}`);
     }
 
     // Triangulate the contours
@@ -62,7 +62,7 @@ export class Tessellator {
       const warning = removeOverlaps
         ? 'libtess returned empty result from triangulation pass'
         : 'libtess returned empty result from single-pass triangulation';
-      debugLogger.warn(warning);
+      logger.warn(warning);
       return { triangles: { vertices: [], indices: [] }, contours };
     }
 
@@ -146,7 +146,7 @@ export class Tessellator {
     );
 
     tess.gluTessCallback(libtess.gluEnum.GLU_TESS_ERROR, (errno: number) => {
-      debugLogger.warn(`libtess error: ${errno}`);
+      logger.warn(`libtess error: ${errno}`);
     });
 
     tess.gluTessNormal(0, 0, 1);

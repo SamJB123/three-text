@@ -64,8 +64,11 @@ export interface LoadedFont {
   upem: number;
   metrics: ExtractedMetrics;
   fontVariations?: { [key: string]: number };
+  fontFeatures?: { [tag: string]: boolean | number };
   isVariable?: boolean;
   variationAxes?: { [key: string]: VariationAxis };
+  availableFeatures?: string[];
+  featureNames?: { [tag: string]: string };
   _buffer?: ArrayBuffer;
 }
 
@@ -87,7 +90,7 @@ export interface HarfBuzzAPI {
   createFace: (blob: HarfBuzzBlob, index: number) => HarfBuzzFace;
   createFont: (face: HarfBuzzFace) => HarfBuzzFont;
   createBuffer: () => HarfBuzzBuffer;
-  shape: (font: HarfBuzzFont, buffer: HarfBuzzBuffer) => void;
+  shape: (font: HarfBuzzFont, buffer: HarfBuzzBuffer, features?: string) => void;
 }
 
 export interface HarfBuzzBlob {
@@ -254,6 +257,7 @@ export interface TextOptions {
   letterSpacing?: number;
   separateGlyphsWithAttributes?: boolean;
   fontVariations?: { [key: string]: number };
+  fontFeatures?: { [tag: string]: boolean | number };
   maxTextLength?: number;
   removeOverlaps?: boolean;
   curveFidelity?: CurveFidelityConfig;

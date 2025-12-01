@@ -1,7 +1,7 @@
 // Based on TeX's line breaking (Knuth, Plass, Liang)
 
 import { perfLogger } from '../../utils/PerformanceLogger';
-import { debugLogger } from '../../utils/DebugLogger';
+import { logger } from '../../utils/Logger';
 import {
   FITNESS_TIGHT_THRESHOLD,
   FITNESS_NORMAL_THRESHOLD,
@@ -630,7 +630,7 @@ export class LineBreak {
       useHyphenation &&
       (!hyphenationPatterns || !hyphenationPatterns[language])
     ) {
-      debugLogger.warn(`Hyphenation patterns for ${language} not available`);
+      logger.warn(`Hyphenation patterns for ${language} not available`);
       useHyphenation = false;
     }
 

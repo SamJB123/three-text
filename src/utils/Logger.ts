@@ -14,7 +14,7 @@ export const isLogEnabled = (() => {
   return false;
 })();
 
-class DebugLogger {
+class Logger {
   warn(message: string, ...args: any[]): void {
     console.warn(message, ...args);
   }
@@ -28,4 +28,4 @@ class DebugLogger {
   }
 }
 
-export const debugLogger = new DebugLogger();
+export const logger = new Logger();

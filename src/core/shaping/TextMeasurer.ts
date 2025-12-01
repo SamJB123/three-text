@@ -1,4 +1,5 @@
 import type { LoadedFont } from '../types';
+import { convertFontFeaturesToString } from './fontFeatures';
 
 export class TextMeasurer {
   public static measureTextWidth(
@@ -9,7 +10,9 @@ export class TextMeasurer {
     const buffer = loadedFont.hb.createBuffer();
     buffer.addText(text);
     buffer.guessSegmentProperties();
-    loadedFont.hb.shape(loadedFont.font, buffer);
+    
+    const featuresString = convertFontFeaturesToString(loadedFont.fontFeatures);
+    loadedFont.hb.shape(loadedFont.font, buffer, featuresString);
 
     const glyphInfos = buffer.json(loadedFont.font);
     const letterSpacingInFontUnits = letterSpacing * loadedFont.upem;
