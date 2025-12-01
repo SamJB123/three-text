@@ -303,6 +303,8 @@ export class LineBreak {
     return filteredPoints;
   }
 
+  // Converts text into items (boxes, glues, penalties) for line breaking.
+  // The measureText function should return widths that include any letter spacing.
   public static itemizeText(
     text: string,
     measureText: (text: string) => number, // function to measure text width

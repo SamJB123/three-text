@@ -56,6 +56,8 @@ export class TextLayout {
     let lines: LineInfo[];
 
     if (width) {
+      // Line breaking uses a measureText function that already includes letterSpacing,
+      // so widths passed into LineBreak.breakText account for tracking
       lines = LineBreak.breakText({
         text,
         width,
@@ -83,7 +85,7 @@ export class TextLayout {
           TextMeasurer.measureTextWidth(
             this.loadedFont,
             textToMeasure,
-            letterSpacing
+            letterSpacing  // Letter spacing included in width measurements
           )
       });
     } else {
