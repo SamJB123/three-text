@@ -18,7 +18,7 @@ import type {
   TextQueryOptions
 } from './types';
 import { perfLogger } from '../utils/PerformanceLogger';
-import { debugLogger } from '../utils/DebugLogger';
+import { logger } from '../utils/Logger';
 import { FontLoader } from './font/FontLoader';
 import { FontMetadataExtractor } from './font/FontMetadata';
 import { TextMeasurer } from './shaping/TextMeasurer';
@@ -107,16 +107,21 @@ export class Text {
         ? options.font
         : `buffer-${Text.generateFontContentHash(options.font)}`;
 
-    const fontKey = options.fontVariations
-      ? `${baseFontKey}_${JSON.stringify(options.fontVariations)}`
-      : baseFontKey;
+    let fontKey = baseFontKey;
+    if (options.fontVariations) {
+      fontKey += `_var_${JSON.stringify(options.fontVariations)}`;
+    }
+    if (options.fontFeatures) {
+      fontKey += `_feat_${JSON.stringify(options.fontFeatures)}`;
+    }
 
     let loadedFont = Text.fontCache.get(fontKey);
     if (!loadedFont) {
       loadedFont = await Text.loadAndCacheFont(
         fontKey,
         options.font,
-        options.fontVariations
+        options.fontVariations,
+        options.fontFeatures
       );
     }
 
@@ -139,13 +144,13 @@ export class Text {
   private static async loadAndCacheFont(
     fontKey: string,
     font: string | ArrayBuffer,
-    fontVariations?: { [key: string]: number }
+    fontVariations?: { [key: string]: number },
+    fontFeatures?: { [tag: string]: boolean | number }
   ): Promise<LoadedFont> {
     const tempText = new Text();
-    await tempText.loadFont(font, fontVariations);
+    await tempText.loadFont(font, fontVariations, fontFeatures);
     const loadedFont = tempText.getLoadedFont()!;
     Text.fontCache.set(fontKey, loadedFont);
-    // Don't destroy tempText - the cached font references its HarfBuzz objects
     return loadedFont;
   }
 
@@ -166,13 +171,17 @@ export class Text {
     const contentHash = Text.generateFontContentHash(loadedFont._buffer);
     this.currentFontId = `font_${contentHash}`;
     if (loadedFont.fontVariations) {
-      this.currentFontId += `_${JSON.stringify(loadedFont.fontVariations)}`;
+      this.currentFontId += `_var_${JSON.stringify(loadedFont.fontVariations)}`;
+    }
+    if (loadedFont.fontFeatures) {
+      this.currentFontId += `_feat_${JSON.stringify(loadedFont.fontFeatures)}`;
     }
   }
 
   private async loadFont(
     fontSrc: string | ArrayBuffer,
-    fontVariations?: { [key: string]: number }
+    fontVariations?: { [key: string]: number },
+    fontFeatures?: { [tag: string]: boolean | number }
   ) {
     perfLogger.start('Text.loadFont', {
       fontSrc:
@@ -204,14 +213,21 @@ export class Text {
         fontBuffer,
         fontVariations
       );
+      
+      if (fontFeatures) {
+        this.loadedFont.fontFeatures = fontFeatures;
+      }
 
       const contentHash = Text.generateFontContentHash(fontBuffer);
       this.currentFontId = `font_${contentHash}`;
       if (fontVariations) {
-        this.currentFontId += `_${JSON.stringify(fontVariations)}`;
+        this.currentFontId += `_var_${JSON.stringify(fontVariations)}`;
+      }
+      if (fontFeatures) {
+        this.currentFontId += `_feat_${JSON.stringify(fontFeatures)}`;
       }
     } catch (error) {
-      debugLogger.error('Failed to load font:', error);
+      logger.error('Failed to load font:', error);
       throw error;
     } finally {
       perfLogger.end('Text.loadFont');
@@ -343,7 +359,7 @@ export class Text {
             }
           };
         } catch (error) {
-          debugLogger.warn(`Failed to load patterns for ${language}: ${error}`);
+          logger.warn(`Failed to load patterns for ${language}: ${error}`);
           return {
             ...options,
             layout: {
@@ -704,7 +720,7 @@ export class Text {
             const pattern = await loadPattern(language, patternsPath);
             Text.patternCache.set(language, pattern);
           } catch (error) {
-            debugLogger.warn(
+            logger.warn(
               `Failed to pre-load patterns for ${language}: ${error}`
             );
           }
@@ -793,7 +809,7 @@ export class Text {
     try {
       FontLoader.destroyFont(currentFont);
     } catch (error) {
-      debugLogger.warn('Error destroying HarfBuzz objects:', error);
+      logger.warn('Error destroying HarfBuzz objects:', error);
     } finally {
       this.loadedFont = undefined;
       this.textLayout = undefined;

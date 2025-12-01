@@ -235,7 +235,7 @@ Then navigate to `http://localhost:3000`
 
 ## Why three-text?
 
-three-text generates high-fidelity 3D mesh geometry from font files. Unlike texture-based approaches, it produces true geometry that can be lit, shaded, and manipulated like any 3D model.
+three-text generates high-fidelity 3D mesh geometry from font files. Unlike texture-based approaches, it produces true geometry that can be lit, shaded, and manipulated like any 3D model
 
 Existing solutions take different approaches:
 
@@ -305,7 +305,7 @@ To optimize performance, three-text generates the geometry for each unique glyph
 3. **Geometry optimization**:
    - **Visvalingam-Whyatt simplification**: removes vertices that contribute the least to the overall shape, preserving sharp corners and subtle curves
    - **Colinear point removal**: eliminates redundant points that lie on straight lines within angle tolerances
-4. **Overlap removal**: removes self-intersections and resolves overlapping paths between glyphs, preserving correct winding rules for triangulation.
+4. **Overlap removal**: removes self-intersections and resolves overlapping paths between glyphs, preserving correct winding rules for triangulation
 5. **Triangulation**: converts cleaned 2D shapes into triangles using libtess2 with non-zero winding rule
 6. **Mesh construction**: generates 2D or 3D geometry with front faces and optional depth/extrusion (back faces and side walls)
 
@@ -334,7 +334,7 @@ The library converts bezier curves into line segments by recursively subdividing
 - `distanceTolerance`: The maximum allowed deviation of the curve from a straight line segment, measured in font units. Lower values produce higher fidelity and more vertices. Default is `0.5`, which is nearly imperceptable without extrusion
 - `angleTolerance`: The maximum angle in radians between segments at a join. This helps preserve sharp corners. Default is `0.2`
 
-In general, this step helps more with time to first render than ongoing interactions in the scene.
+In general, this step helps more with time to first render than ongoing interactions in the scene
 
 ```javascript
 // Using the default configuration
@@ -537,6 +537,28 @@ const text = await Text.create({
 });
 ```
 
+## OpenType Features
+
+The `fontFeatures` option controls OpenType layout features using 4-character tags from the [feature registry](https://learn.microsoft.com/en-us/typography/opentype/spec/featuretags):
+
+```javascript
+const text = await Text.create({
+  text: 'Difficult ffi ffl',
+  font: '/fonts/Font.ttf',
+  fontFeatures: {
+    liga: true,
+    dlig: true,
+    kern: false,
+    ss01: 1,
+    cv01: 3,
+  },
+});
+```
+
+Values can be boolean (`true`/`false`) to enable or disable, or numeric for features accepting variant indices. Explicitly disabling a feature overrides the font's defaults
+
+Common tags include [`liga`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#liga) (ligatures), [`kern`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#kern) (kerning), [`calt`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#calt) (contextual alternates), and [`smcp`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#smcp) (small capitals). Number styling uses [`lnum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#lnum)/[`onum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#onum)/[`tnum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#tnum). Stylistic alternates are [`ss01`-`ss20`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#ss01--ss20) and [`cv01`-`cv99`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#cv01--cv99). Feature availability depends on the font
+
 ## Querying text content
 
 After creating text geometry, use the `query()` method to find text ranges:
@@ -634,7 +656,7 @@ The library's full TypeScript definitions are the most complete source of truth 
 
 #### `Text.create(options: TextOptions): Promise<TextGeometryInfo>`
 
-Creates text geometry with automatic font loading and HarfBuzz initialization.
+Creates text geometry with automatic font loading and HarfBuzz initialization
 
 **Core (`three-text`) returns:**
 - `vertices: Float32Array` - Vertex positions
@@ -694,6 +716,7 @@ interface TextOptions {
   lineHeight?: number; // Line height multiplier (default: 1.0)
   letterSpacing?: number; // Letter spacing as a fraction of em (e.g., 0.05)
   fontVariations?: { [key: string]: number }; // Variable font axis settings
+  fontFeatures?: { [tag: string]: boolean | number }; // OpenType feature settings
   removeOverlaps?: boolean; // Override default overlap removal (auto-enabled for VF only)
   separateGlyphsWithAttributes?: boolean; // Force individual glyph tessellation and add shader attributes
   color?: [number, number, number] | ColorOptions; // Text coloring (simple or complex)

@@ -6,7 +6,7 @@ import {
   FONT_SIGNATURE_OPEN_TYPE_CFF,
   FONT_SIGNATURE_TRUE_TYPE_COLLECTION
 } from './constants';
-import { debugLogger } from '../../utils/DebugLogger';
+import { logger } from '../../utils/Logger';
 import { WoffConverter } from './WoffConverter';
 
 export class FontLoader {
@@ -31,7 +31,7 @@ export class FontLoader {
     // Check if this is a WOFF font and decompress if needed
     const format = WoffConverter.detectFormat(fontBuffer);
     if (format === 'woff') {
-      debugLogger.log('WOFF font detected, decompressing...');
+      logger.log('WOFF font detected, decompressing...');
       fontBuffer = await WoffConverter.decompressWoff(fontBuffer);
     } else if (format === 'woff2') {
       throw new Error(
@@ -96,7 +96,7 @@ export class FontLoader {
         variationAxes
       };
     } catch (error) {
-      debugLogger.error('Failed to load font:', error);
+      logger.error('Failed to load font:', error);
       throw error;
     } finally {
       perfLogger.end('FontLoader.loadFont');
@@ -120,7 +120,7 @@ export class FontLoader {
         loadedFont.fontBlob.destroy();
       }
     } catch (error) {
-      debugLogger.error('Error destroying font resources:', error);
+      logger.error('Error destroying font resources:', error);
     }
   }
 }

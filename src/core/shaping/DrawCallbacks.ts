@@ -1,6 +1,6 @@
 import { LoadedFont } from '../types';
 import { GlyphContourCollector } from '../cache/GlyphContourCollector';
-import { debugLogger } from '../../utils/DebugLogger';
+import { logger } from '../../utils/Logger';
 
 // HarfBuzz callbacks
 export class DrawCallbackHandler {
@@ -186,7 +186,7 @@ export class DrawCallbackHandler {
         this.closePath_func = null;
       }
     } catch (error) {
-      debugLogger.warn('Error destroying draw callbacks:', error);
+      logger.warn('Error destroying draw callbacks:', error);
     }
 
     this.collector = undefined;

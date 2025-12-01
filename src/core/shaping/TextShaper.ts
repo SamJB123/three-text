@@ -12,6 +12,7 @@ import { GlyphGeometryBuilder } from '../cache/GlyphGeometryBuilder';
 import { TextMeasurer } from './TextMeasurer';
 import { perfLogger } from '../../utils/PerformanceLogger';
 import { SPACE_STRETCH_RATIO, SPACE_SHRINK_RATIO } from '../layout/constants';
+import { convertFontFeaturesToString } from './fontFeatures';
 
 export interface ShapedResult {
   geometry: any;
@@ -103,7 +104,10 @@ export class TextShaper {
 
     buffer.addText(lineInfo.text);
     buffer.guessSegmentProperties();
-    this.loadedFont.hb.shape(this.loadedFont.font, buffer);
+    
+    const featuresString = convertFontFeaturesToString(this.loadedFont.fontFeatures);
+    this.loadedFont.hb.shape(this.loadedFont.font, buffer, featuresString);
+    
     const glyphInfos: HarfBuzzGlyph[] = buffer.json(this.loadedFont.font);
     buffer.destroy();
 

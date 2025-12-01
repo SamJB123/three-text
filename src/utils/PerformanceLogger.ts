@@ -1,4 +1,4 @@
-import { debugLogger, isLogEnabled } from './DebugLogger';
+import { logger, isLogEnabled } from './Logger';
 
 interface PerformanceMetric {
   name: string;
@@ -41,7 +41,7 @@ class PerformanceLogger {
     const startTime = this.activeTimers.get(name);
 
     if (startTime === undefined) {
-      debugLogger.warn(`Performance timer "${name}" was not started`);
+      logger.warn(`Performance timer "${name}" was not started`);
       return null;
     }
 
