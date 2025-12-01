@@ -466,25 +466,6 @@ const text = await Text.create({
 });
 ```
 
-### Per-glyph animation attributes
-
-For shader-based animations and interactive effects, the library can generate per-vertex attributes that identify which glyph each vertex belongs to:
-
-```javascript
-const text = await Text.create({
-  text: 'Sample text',
-  font: '/fonts/Font.ttf',
-  separateGlyphsWithAttributes: true,
-});
-
-// Geometry includes these vertex attributes:
-// - glyphCenter (vec3): center point of each glyph
-// - glyphIndex (float): sequential glyph index
-// - glyphLineIndex (float): line number
-```
-
-This option bypasses overlap-based clustering and adds vertex attributes suitable for per-character manipulation in vertex shaders. Each unique glyph is still tessellated only once and cached for reuse. The tradeoff is potential visual artifacts where glyphs actually overlap (tight kerning, cursive scripts)
-
 ### Variable fonts
 
 Variable fonts allow dynamic adjustment of typographic characteristics through variation axes:
@@ -537,7 +518,7 @@ const text = await Text.create({
 });
 ```
 
-## OpenType Features
+### OpenType features
 
 The `fontFeatures` option controls OpenType layout features using 4-character tags from the [feature registry](https://learn.microsoft.com/en-us/typography/opentype/spec/featuretags):
 
@@ -558,6 +539,25 @@ const text = await Text.create({
 Values can be boolean (`true`/`false`) to enable or disable, or numeric for features accepting variant indices. Explicitly disabling a feature overrides the font's defaults
 
 Common tags include [`liga`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#liga) (ligatures), [`kern`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#kern) (kerning), [`calt`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#calt) (contextual alternates), and [`smcp`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#smcp) (small capitals). Number styling uses [`lnum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#lnum)/[`onum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#onum)/[`tnum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#tnum). Stylistic alternates are [`ss01`-`ss20`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#ss01--ss20) and [`cv01`-`cv99`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#cv01--cv99). Feature availability depends on the font
+
+### Per-glyph attributes
+
+For shader-based animations and interactive effects, the library can generate per-vertex attributes that identify which glyph each vertex belongs to:
+
+```javascript
+const text = await Text.create({
+  text: 'Sample text',
+  font: '/fonts/Font.ttf',
+  separateGlyphsWithAttributes: true,
+});
+
+// Geometry includes these vertex attributes:
+// - glyphCenter (vec3): center point of each glyph
+// - glyphIndex (float): sequential glyph index
+// - glyphLineIndex (float): line number
+```
+
+This option bypasses overlap-based clustering and adds vertex attributes suitable for per-character manipulation in vertex shaders. Each unique glyph is still tessellated only once and cached for reuse. The tradeoff is potential visual artifacts where glyphs actually overlap (tight kerning, cursive scripts)
 
 ## Querying text content
 
