@@ -67,6 +67,8 @@ export interface LoadedFont {
   fontFeatures?: { [tag: string]: boolean | number };
   isVariable?: boolean;
   variationAxes?: { [key: string]: VariationAxis };
+  availableFeatures?: string[];
+  featureNames?: { [tag: string]: string };
   _buffer?: ArrayBuffer;
 }
 

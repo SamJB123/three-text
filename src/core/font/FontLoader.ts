@@ -83,6 +83,8 @@ export class FontLoader {
         }
       }
 
+      const featureData = FontMetadataExtractor.extractFeatureTags(fontBuffer);
+
       return {
         hb,
         fontBlob,
@@ -93,7 +95,9 @@ export class FontLoader {
         metrics,
         fontVariations,
         isVariable,
-        variationAxes
+        variationAxes,
+        availableFeatures: featureData?.tags,
+        featureNames: featureData?.names
       };
     } catch (error) {
       logger.error('Failed to load font:', error);

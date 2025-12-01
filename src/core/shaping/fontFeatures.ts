@@ -1,7 +1,6 @@
 import { logger } from '../../utils/Logger';
 
-// HarfBuzz expects features as comma-separated strings, not objects
-// We provide objects because they're easier to manipulate programmatically
+// Convert feature objects to HarfBuzz comma-separated format
 export function convertFontFeaturesToString(
   features?: { [tag: string]: boolean | number }
 ): string | undefined {

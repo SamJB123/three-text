@@ -120,6 +120,118 @@ export class FontMetadataExtractor {
     };
   }
 
+  public static extractFeatureTags(
+    fontBuffer: ArrayBuffer
+  ): { tags: string[]; names: { [tag: string]: string } } | undefined {
+    const view = new DataView(fontBuffer);
+    const numTables = view.getUint16(4);
+    const buffer = new Uint8Array(fontBuffer);
+
+    let gsubTableOffset = 0;
+    let gposTableOffset = 0;
+    let nameTableOffset = 0;
+
+    for (let i = 0; i < numTables; i++) {
+      const tag = new TextDecoder().decode(
+        buffer.slice(12 + i * 16, 12 + i * 16 + 4)
+      );
+
+      if (tag === 'GSUB') {
+        gsubTableOffset = view.getUint32(12 + i * 16 + 8);
+      }
+
+      if (tag === 'GPOS') {
+        gposTableOffset = view.getUint32(12 + i * 16 + 8);
+      }
+
+      if (tag === 'name') {
+        nameTableOffset = view.getUint32(12 + i * 16 + 8);
+      }
+    }
+
+    const features = new Set<string>();
+    const featureNames: { [tag: string]: string } = {};
+
+    try {
+      if (gsubTableOffset) {
+        const gsubData = this.extractFeatureDataFromTable(view, gsubTableOffset, nameTableOffset);
+        gsubData.features.forEach(f => features.add(f));
+        Object.assign(featureNames, gsubData.names);
+      }
+
+      if (gposTableOffset) {
+        const gposData = this.extractFeatureDataFromTable(view, gposTableOffset, nameTableOffset);
+        gposData.features.forEach(f => features.add(f));
+        Object.assign(featureNames, gposData.names);
+      }
+    } catch (e) {
+      return undefined;
+    }
+
+    const featureArray = Array.from(features).sort();
+    if (featureArray.length === 0) return undefined;
+
+    return {
+      tags: featureArray,
+      names: Object.keys(featureNames).length > 0 ? featureNames : {}
+    };
+  }
+
+  private static extractFeatureDataFromTable(
+    view: DataView,
+    tableOffset: number,
+    nameTableOffset: number
+  ): { features: string[]; names: { [tag: string]: string } } {
+    const featureListOffset = view.getUint16(tableOffset + 6);
+    const featureListStart = tableOffset + featureListOffset;
+    const featureCount = view.getUint16(featureListStart);
+    
+    const features: string[] = [];
+    const names: { [tag: string]: string } = {};
+
+    for (let i = 0; i < featureCount; i++) {
+      const recordOffset = featureListStart + 2 + i * 6;
+      const tag = String.fromCharCode(
+        view.getUint8(recordOffset),
+        view.getUint8(recordOffset + 1),
+        view.getUint8(recordOffset + 2),
+        view.getUint8(recordOffset + 3)
+      );
+      features.push(tag);
+
+      // Extract feature name for stylistic sets and character variants
+      if (/^(ss\d{2}|cv\d{2})$/.test(tag) && nameTableOffset) {
+        const featureOffset = view.getUint16(recordOffset + 4);
+        const featureTableStart = featureListStart + featureOffset;
+        
+        // Feature table structure:
+        // uint16 FeatureParams offset
+        // uint16 LookupCount
+        // uint16[LookupCount] LookupListIndex
+        
+        const featureParamsOffset = view.getUint16(featureTableStart);
+        
+        // FeatureParams for ss features:
+        // uint16 Version (should be 0)
+        // uint16 UINameID
+        if (featureParamsOffset !== 0) {
+          const paramsStart = featureTableStart + featureParamsOffset;
+          const version = view.getUint16(paramsStart);
+          
+          if (version === 0) {
+            const nameID = view.getUint16(paramsStart + 2);
+            const name = this.getNameFromNameTable(view, nameTableOffset, nameID);
+            if (name) {
+              names[tag] = name;
+            }
+          }
+        }
+      }
+    }
+
+    return { features, names };
+  }
+
   private static extractAxisNames(
     view: DataView,
     statOffset: number,
