@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.6] - 2025-12-01
+
+### Added
+
+- Added support for OpenType features via `fontFeatures` option in `TextOptions`
+- Added `fontFeatures` helper to validate and format feature tags for HarfBuzz
+
+### Changed
+
+- `DebugLogger.ts` has become `Logger.ts` and `debugLogger` is now `logger`
+- Optimized font metadata parsing (2x faster) by using integer tag comparisons instead of string decoding
+
 ## [0.2.5] - 2025-11-30
 
 ### Fixed
