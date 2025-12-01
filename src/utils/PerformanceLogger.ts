@@ -117,6 +117,10 @@ class PerformanceLogger {
     this.activeTimers.clear();
   }
 
+  public reset(): void {
+    this.clear();
+  }
+
   public time<T>(name: string, fn: () => T, metadata?: Record<string, any>): T {
     if (!isLogEnabled) return fn();
 

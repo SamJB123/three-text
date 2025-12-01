@@ -1,5 +1,6 @@
 import { Vec3 } from '../vectors';
 import type { GlyphContours } from '../types';
+import { perfLogger } from '../../utils/PerformanceLogger';
 
 interface BBox {
   minX: number;
@@ -17,11 +18,18 @@ export class BoundaryClusterer {
     glyphContoursList: GlyphContours[],
     positions: Vec3[]
   ): number[][] {
+    perfLogger.start('BoundaryClusterer.cluster', {
+      glyphCount: glyphContoursList.length
+    });
+
     if (glyphContoursList.length === 0) {
+      perfLogger.end('BoundaryClusterer.cluster');
       return [];
     }
 
-    return this.clusterSweepLine(glyphContoursList, positions);
+    const result = this.clusterSweepLine(glyphContoursList, positions);
+    perfLogger.end('BoundaryClusterer.cluster');
+    return result;
   }
 
   private clusterSweepLine(

@@ -15,6 +15,7 @@ import { GlyphContourCollector } from './GlyphContourCollector';
 import { DrawCallbackHandler } from '../shaping/DrawCallbacks';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
 import { HarfBuzzGlyph } from '../types';
+import { LRUCache } from '../../utils/LRUCache';
 
 export interface InstancedTextGeometry {
   vertices: Float32Array;
@@ -37,6 +38,7 @@ export class GlyphGeometryBuilder {
   private drawCallbacks: DrawCallbackHandler;
   private loadedFont: LoadedFont;
   private wordCache = new Map<string, GlyphData>();
+  private contourCache: LRUCache<number, GlyphContours>;
 
   constructor(cache: GlyphCache, loadedFont: LoadedFont) {
     this.cache = cache;
@@ -47,6 +49,16 @@ export class GlyphGeometryBuilder {
     this.collector = new GlyphContourCollector();
     this.drawCallbacks = new DrawCallbackHandler();
     this.drawCallbacks.createDrawFuncs(this.loadedFont, this.collector);
+    this.contourCache = new LRUCache<number, GlyphContours>({
+      maxEntries: 1000,
+      calculateSize: (contours) => {
+        let size = 0;
+        for (const path of contours.paths) {
+          size += path.points.length * 16; // Vec2 = 2 floats * 8 bytes
+        }
+        return size + 64; // bounds overhead
+      }
+    });
   }
 
   public getOptimizationStats() {
@@ -310,6 +322,11 @@ export class GlyphGeometryBuilder {
   }
 
   private getContoursForGlyph(glyphId: number): GlyphContours {
+    const cached = this.contourCache.get(glyphId);
+    if (cached) {
+      return cached;
+    }
+
     this.collector.reset();
     this.collector.beginGlyph(glyphId, 0);
     this.loadedFont.module.exports.hb_font_draw_glyph(
@@ -321,19 +338,17 @@ export class GlyphGeometryBuilder {
     this.collector.finishGlyph();
     const collected = this.collector.getCollectedGlyphs()[0];
 
-    // Return empty contours for glyphs with no paths (e.g., space, zero-width characters)
-    if (!collected) {
-      return {
-        glyphId,
-        paths: [],
-        bounds: {
-          min: { x: 0, y: 0 },
-          max: { x: 0, y: 0 }
-        }
-      };
-    }
+    const contours = collected || {
+      glyphId,
+      paths: [],
+      bounds: {
+        min: { x: 0, y: 0 },
+        max: { x: 0, y: 0 }
+      }
+    };
 
-    return collected;
+    this.contourCache.set(glyphId, contours);
+    return contours;
   }
 
   private tessellateGlyphCluster(
@@ -346,11 +361,16 @@ export class GlyphGeometryBuilder {
   }
 
   private extrudeAndPackage(processedGeometry: any, depth: number): GlyphData {
+    perfLogger.start('Extruder.extrude', {
+      depth,
+      upem: this.loadedFont.upem
+    });
     const extrudedResult = this.extruder.extrude(
       processedGeometry,
       depth,
       this.loadedFont.upem
     );
+    perfLogger.end('Extruder.extrude');
 
     // Compute bounding box from vertices
     const vertices = extrudedResult.vertices;
@@ -401,12 +421,12 @@ export class GlyphGeometryBuilder {
       glyphId: glyphContours.glyphId,
       pathCount: glyphContours.paths.length
     });
-
     const processedGeometry = this.tessellator.process(
       glyphContours.paths,
       removeOverlaps,
       isCFF
     );
+    perfLogger.end('GlyphGeometryBuilder.tessellateGlyph');
 
     return this.extrudeAndPackage(processedGeometry, depth);
   }

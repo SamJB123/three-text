@@ -7,6 +7,7 @@ import {
 } from '../geometry/PathOptimizer';
 import { Polygonizer, COLLINEARITY_EPSILON } from '../geometry/Polygonizer';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
+import { perfLogger } from '../../utils/PerformanceLogger';
 
 export class GlyphContourCollector {
   private currentGlyphId: number = 0;
@@ -62,6 +63,12 @@ export class GlyphContourCollector {
 
     // Record position for this glyph
     this.glyphPositions.push(this.currentPosition.clone());
+
+    // Time polygonization + path optimization per glyph
+    perfLogger.start('Glyph.polygonizeAndOptimize', {
+      glyphId,
+      textIndex
+    });
   }
 
   public finishGlyph(): void {
@@ -88,6 +95,9 @@ export class GlyphContourCollector {
       // Track textIndex separately
       this.glyphTextIndices.push(this.currentTextIndex);
     }
+
+    // Stop timing for this glyph (even if it ended up empty)
+    perfLogger.end('Glyph.polygonizeAndOptimize');
 
     this.currentGlyphPaths = [];
   }
