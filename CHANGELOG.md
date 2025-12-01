@@ -11,8 +11,7 @@
 
 ### Changed
 
-- Contour polygonization now cached per glyph, reducing redundant work by ~93%
-- Performance logging now includes `reset()` method for benchmark scenarios
+- Performance logging now includes `reset()` method for benchmark
 
 ## [0.2.6] - 2025-12-01
 
