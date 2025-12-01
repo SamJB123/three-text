@@ -960,7 +960,7 @@ Tests use mocked HarfBuzz and tessellation libraries for fast execution without 
 
 ### Benchmarking
 
-For end-to-end performance of the real pipeline (HarfBuzz, shaping, layout, tessellation, extrusion), there is a dedicated benchmark:
+For performance of the real pipeline using HarfBuzz, including shaping, layout, tessellation, extrusion, there is a dedicated benchmark:
 
 ```bash
 npm run benchmark
@@ -969,7 +969,7 @@ npm run benchmark
 This runs a Node/Vitest scenario that:
 
 - initializes HarfBuzz from `hb.wasm` via `Text.setHarfBuzzBuffer`
-- loads the Nimbus example font and the long example paragraph from the demos
+- loads Nimbus Sans and tests the example paragraph from the demos
 - performs a small number of cold runs followed by warm runs of `Text.create()` with justification and hyphenation enabled
 - prints a per-stage timing table (font load, line breaking, polygonization, tessellation, extrusion, and overall geometry creation)
 
