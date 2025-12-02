@@ -395,7 +395,7 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 - **tolerance** (800): Maximum badness for the second pass with hyphenation
 - **emergencyStretch** (0): Additional stretchability for difficult paragraphs
 - **autoEmergencyStretch** (0.1): Emergency stretch as percentage of line width (e.g., 0.1 = 10%). Defaults to 10% for non-hyphenated text
-- **disableSingleWordDetection** (false): Disable automatic prevention of short single-word lines
+- **disableShortLineDetection** (false): Disable automatic prevention of short lines (3 or fewer words at <75% width)
 
 #### Advanced parameters
 
@@ -416,9 +416,9 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 
 Lower penalty/tolerance values produce tighter spacing but may fail to find acceptable breaks for challenging text
 
-#### Single-word line detection
+#### Short line detection
 
-By default, the library detects and prevents short single-word lines (words occupying less than 50% of the line width on non-final lines) by iteratively applying emergency stretch. This can be disabled if needed:
+By default, the library detects and prevents short lines (lines with 3 or fewer words occupying less than 75% of the line width on non-final lines) by iteratively applying emergency stretch. This can be disabled if needed:
 
 ```javascript
 const text = await Text.create({
@@ -426,7 +426,7 @@ const text = await Text.create({
   font: '/fonts/Font.ttf',
   layout: {
     width: 1000,
-    disableSingleWordDetection: true,
+    disableShortLineDetection: true,
   },
 });
 ```
@@ -754,7 +754,7 @@ interface LayoutOptions {
   pretolerance?: number; // Maximum badness for first pass (default: 100)
   emergencyStretch?: number; // Additional stretchability for difficult paragraphs
   autoEmergencyStretch?: number; // Emergency stretch as percentage of line width (defaults to 10% for non-hyphenated)
-  disableSingleWordDetection?: boolean; // Disable automatic single-word line prevention (default: false)
+  disableShortLineDetection?: boolean; // Disable automatic short line prevention (default: false)
   lefthyphenmin?: number; // Minimum character
   // s before hyphen (default: 2)
   righthyphenmin?: number; // Minimum characters after hyphen (default: 4)
