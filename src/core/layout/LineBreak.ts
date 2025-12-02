@@ -190,10 +190,10 @@ export interface LineBreakOptions {
   // Looseness: adjust paragraph length by n lines
   looseness?: number;
 
-  // Disable automatic detection and prevention of short single-word lines
+  // Disable automatic detection and prevention of short lines
   // When enabled (default), iteratively applies emergency stretch to eliminate
-  // isolated words on lines that are less than 50% of the target width.
-  disableSingleWordDetection?: boolean;
+  // short lines (3 or fewer words) that are less than 75% of the target width.
+  disableShortLineDetection?: boolean;
 }
 
 interface LineBreakContext {
@@ -223,9 +223,10 @@ const INF_BAD = 10000;
 // Non TeX default: emergency stretch for non-hyphenated text (10% of line width)
 const DEFAULT_EMERGENCY_STRETCH_NO_HYPHEN = 0.1;
 
-// Another non TeX default: Single-word line detection thresholds
-const SINGLE_WORD_WIDTH_THRESHOLD = 0.5; // Lines < 50% of width are problematic
-const SINGLE_WORD_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
+// Another non TeX default: Short line detection thresholds
+const SHORT_LINE_MAX_WORDS = 3; // Lines with 3 or fewer words are checked
+const SHORT_LINE_WIDTH_THRESHOLD = 0.75; // Lines < 75% of width are problematic
+const SHORT_LINE_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
 
 export class LineBreak {
   // Calculate badness according to TeX's formula (tex.web §108, line 2337)
@@ -514,8 +515,8 @@ export class LineBreak {
     return items;
   }
 
-  // Detect if breakpoints create problematic single-word lines
-  private static hasSingleWordLines(
+  // Detect if breakpoints create problematic short lines
+  private static hasShortLines(
     items: Item[],
     breakpoints: number[],
     lineWidth: number
@@ -533,16 +534,22 @@ export class LineBreak {
       for (let j = lineStart; j < breakpoint; j++) {
         if (items[j].type === ItemType.GLUE) {
           glueCount++;
+          if (glueCount >= SHORT_LINE_MAX_WORDS) {
+            break;
+          }
         }
         if (items[j].type !== ItemType.PENALTY) {
           totalWidth += items[j].width;
         }
       }
 
-      // Single word line = no glue items
-      if (glueCount === 0 && totalWidth > 0) {
+      // Number of words = glue count + 1 (spaces between words)
+      const wordCount = glueCount + 1;
+
+      // Check if line has few words and is narrow relative to target width
+      if (wordCount <= SHORT_LINE_MAX_WORDS && totalWidth > 0) {
         const widthRatio = totalWidth / lineWidth;
-        if (widthRatio < SINGLE_WORD_WIDTH_THRESHOLD) {
+        if (widthRatio < SHORT_LINE_WIDTH_THRESHOLD) {
           return true;
         }
       }
@@ -583,7 +590,7 @@ export class LineBreak {
       exhyphenpenalty = DEFAULT_EX_HYPHEN_PENALTY,
       doublehyphendemerits = DEFAULT_DOUBLE_HYPHEN_DEMERITS,
       looseness = 0,
-      disableSingleWordDetection = false
+      disableShortLineDetection = false
     } = options;
 
     // Handle multiple paragraphs by processing each independently
@@ -699,7 +706,7 @@ export class LineBreak {
     let iteration = 0;
     let currentEmergencyStretch = initialEmergencyStretch;
     let resultLines: LineInfo[] | null = null;
-    const singleWordDetectionEnabled = !disableSingleWordDetection;
+    const shortLineDetectionEnabled = !disableShortLineDetection;
 
     while (iteration < MAX_ITERATIONS) {
       // Three-pass approach for optimal line breaking:
@@ -783,15 +790,15 @@ export class LineBreak {
           context
         );
 
-        // Check for single-word lines if detection is enabled
+        // Check for short lines if detection is enabled
         if (
-          singleWordDetectionEnabled &&
+          shortLineDetectionEnabled &&
           breaks.length > 1 &&
-          LineBreak.hasSingleWordLines(currentItems, breaks, width)
+          LineBreak.hasShortLines(currentItems, breaks, width)
         ) {
           // Increase emergency stretch and try again
           currentEmergencyStretch +=
-            width * SINGLE_WORD_EMERGENCY_STRETCH_INCREMENT;
+            width * SHORT_LINE_EMERGENCY_STRETCH_INCREMENT;
           iteration++;
           continue;
         }

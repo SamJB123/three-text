@@ -49,7 +49,7 @@ export class TextLayout {
       exhyphenpenalty,
       doublehyphendemerits,
       looseness,
-      disableSingleWordDetection,
+      disableShortLineDetection,
       letterSpacing
     } = options;
 
@@ -79,7 +79,7 @@ export class TextLayout {
         exhyphenpenalty,
         doublehyphendemerits,
         looseness,
-        disableSingleWordDetection,
+        disableShortLineDetection,
         unitsPerEm: this.loadedFont.upem,
         measureText: (textToMeasure: string) =>
           TextMeasurer.measureTextWidth(

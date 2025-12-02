@@ -1,17 +1,20 @@
 # Changelog
 
+## [0.2.8] - 2025-12-01
+
+### Changed
+
+- Short line detection now checks lines with 3 or fewer words at 75% width threshold (previously single words at 50%)
+- Renamed `disableSingleWordDetection` option to `disableShortLineDetection`
+
 ## [0.2.7] - 2025-12-01
 
 ### Added
 
-- Polygonized contour cache to avoid redundant curve subdivision
+- Polygonized contour cache
 - Generic LRU cache in `src/utils/LRUCache.ts`
 - Integration tests with real HarfBuzz and fonts
 - `npm run benchmark` command for performance measurement
-
-### Changed
-
-- Performance logging now includes `reset()` method for benchmark
 
 ## [0.2.6] - 2025-12-01
 
