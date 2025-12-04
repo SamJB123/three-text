@@ -50,6 +50,7 @@ export class TextLayout {
       doublehyphendemerits,
       looseness,
       disableShortLineDetection,
+      shortLineThreshold,
       letterSpacing
     } = options;
 
@@ -80,6 +81,7 @@ export class TextLayout {
         doublehyphendemerits,
         looseness,
         disableShortLineDetection,
+        shortLineThreshold,
         unitsPerEm: this.loadedFont.upem,
         measureText: (textToMeasure: string) =>
           TextMeasurer.measureTextWidth(

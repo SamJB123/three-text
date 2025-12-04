@@ -395,7 +395,8 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 - **tolerance** (800): Maximum badness for the second pass with hyphenation
 - **emergencyStretch** (0): Additional stretchability for difficult paragraphs
 - **autoEmergencyStretch** (0.1): Emergency stretch as percentage of line width (e.g., 0.1 = 10%). Defaults to 10% for non-hyphenated text
-- **disableShortLineDetection** (false): Disable automatic prevention of short lines (3 or fewer words at <75% width)
+- **disableShortLineDetection** (false): Disable automatic prevention of short lines
+- **shortLineThreshold** (0.5): Width ratio threshold for short line detection (0.0 to 1.0)
 
 #### Advanced parameters
 
@@ -418,7 +419,7 @@ Lower penalty/tolerance values produce tighter spacing but may fail to find acce
 
 #### Short line detection
 
-By default, the library detects and prevents short lines (lines with 3 or fewer words occupying less than 75% of the line width on non-final lines) by iteratively applying emergency stretch. This can be disabled if needed:
+By default, the library detects and prevents short lines (lines occupying less than 50% of the target width on non-final lines) by iteratively applying emergency stretch. This can be customized or disabled:
 
 ```javascript
 const text = await Text.create({
@@ -426,7 +427,9 @@ const text = await Text.create({
   font: '/fonts/Font.ttf',
   layout: {
     width: 1000,
-    disableShortLineDetection: true,
+    shortLineThreshold: 0.6,  // Only flag lines < 60% width (more lenient)
+    // Or disable entirely:
+    // disableShortLineDetection: true,
   },
 });
 ```
@@ -755,8 +758,8 @@ interface LayoutOptions {
   emergencyStretch?: number; // Additional stretchability for difficult paragraphs
   autoEmergencyStretch?: number; // Emergency stretch as percentage of line width (defaults to 10% for non-hyphenated)
   disableShortLineDetection?: boolean; // Disable automatic short line prevention (default: false)
-  lefthyphenmin?: number; // Minimum character
-  // s before hyphen (default: 2)
+  shortLineThreshold?: number; // Width ratio threshold for short line detection (default: 0.5)
+  lefthyphenmin?: number; // Minimum characters before hyphen (default: 2)
   righthyphenmin?: number; // Minimum characters after hyphen (default: 4)
   linepenalty?: number; // Base penalty per line (default: 10)
   adjdemerits?: number; // Penalty for incompatible fitness classes (default: 10000)

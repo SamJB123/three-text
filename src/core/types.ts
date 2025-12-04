@@ -305,4 +305,5 @@ export interface LayoutOptions {
   doublehyphendemerits?: number;
   looseness?: number;
   disableShortLineDetection?: boolean;
+  shortLineThreshold?: number;
 }
