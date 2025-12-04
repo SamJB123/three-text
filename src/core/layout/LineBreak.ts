@@ -192,8 +192,13 @@ export interface LineBreakOptions {
 
   // Disable automatic detection and prevention of short lines
   // When enabled (default), iteratively applies emergency stretch to eliminate
-  // short lines (3 or fewer words) that are less than 75% of the target width.
+  // lines that are less than 50% of the target width.
   disableShortLineDetection?: boolean;
+
+  // Threshold for short line detection (0.0 to 1.0, default: 0.5)
+  // Lines with width less than this ratio of the target width are considered problematic
+  // and will trigger additional emergency stretch to push words to the next line.
+  shortLineThreshold?: number;
 }
 
 interface LineBreakContext {
@@ -224,8 +229,7 @@ const INF_BAD = 10000;
 const DEFAULT_EMERGENCY_STRETCH_NO_HYPHEN = 0.1;
 
 // Another non TeX default: Short line detection thresholds
-const SHORT_LINE_MAX_WORDS = 3; // Lines with 3 or fewer words are checked
-const SHORT_LINE_WIDTH_THRESHOLD = 0.75; // Lines < 75% of width are problematic
+const SHORT_LINE_WIDTH_THRESHOLD = 0.5; // Lines < 50% of width are problematic
 const SHORT_LINE_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
 
 export class LineBreak {
@@ -770,37 +774,26 @@ export class LineBreak {
   private static hasShortLines(
     items: Item[],
     breakpoints: number[],
-    lineWidth: number
+    lineWidth: number,
+    threshold: number
   ): boolean {
     // Check each line segment (except the last, which can naturally be short)
     let lineStart = 0;
 
     for (let i = 0; i < breakpoints.length - 1; i++) {
       const breakpoint = breakpoints[i];
-
-      // Count glue items (spaces) between line start and breakpoint
-      let glueCount = 0;
       let totalWidth = 0;
 
       for (let j = lineStart; j < breakpoint; j++) {
-        if (items[j].type === ItemType.GLUE) {
-          glueCount++;
-          if (glueCount >= SHORT_LINE_MAX_WORDS) {
-            break;
-          }
-        }
         if (items[j].type !== ItemType.PENALTY) {
           totalWidth += items[j].width;
         }
       }
 
-      // Number of words = glue count + 1 (spaces between words)
-      const wordCount = glueCount + 1;
-
-      // Check if line has few words and is narrow relative to target width
-      if (wordCount <= SHORT_LINE_MAX_WORDS && totalWidth > 0) {
+      // Check if line is narrow relative to target width
+      if (totalWidth > 0) {
         const widthRatio = totalWidth / lineWidth;
-        if (widthRatio < SHORT_LINE_WIDTH_THRESHOLD) {
+        if (widthRatio < threshold) {
           return true;
         }
       }
@@ -841,7 +834,8 @@ export class LineBreak {
       exhyphenpenalty = DEFAULT_EX_HYPHEN_PENALTY,
       doublehyphendemerits = DEFAULT_DOUBLE_HYPHEN_DEMERITS,
       looseness = 0,
-      disableShortLineDetection = false
+      disableShortLineDetection = false,
+      shortLineThreshold = SHORT_LINE_WIDTH_THRESHOLD
     } = options;
 
     // Handle multiple paragraphs by processing each independently
@@ -1043,7 +1037,7 @@ export class LineBreak {
         if (
           shortLineDetectionEnabled &&
           breaks.length > 1 &&
-          LineBreak.hasShortLines(currentItems, breaks, width)
+          LineBreak.hasShortLines(currentItems, breaks, width, shortLineThreshold)
         ) {
           // Increase emergency stretch and try again
           currentEmergencyStretch +=

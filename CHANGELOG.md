@@ -4,18 +4,15 @@
 
 ### Added
 
-- Chinese and Japanese now have character-level line breaking / inter-character glue. No breaks before closing punctuation or after opening punctuation
-- Mixed script support
+- Chinese, Japanese, Korean (CJK) now have character-level line breaking / inter-character glue. No breaks before closing punctuation or after opening punctuation
+- Mixed script support (automatic switching between CJK and word-based scripts)
+- Added `shortLineThreshold` parameter to customize short line detection (default: 0.5)
 
 ### Changed
 
-- Hyphenation now computed on-demand (second pass only if first pass fails)
-
-## [0.2.8] - 2025-12-01
-
-### Changed
-
-- Short line detection now checks lines with 3 or fewer words at 75% width threshold (previously single words at 50%)
+- Hyphenation now on-demand (second pass only if first pass fails)
+- Short line detection now checks all lines (not just those with 3 or fewer words)
+- Short line detection threshold reduced from 75% to 50% for better balance
 - Renamed `disableSingleWordDetection` option to `disableShortLineDetection`
 
 ## [0.2.7] - 2025-12-01

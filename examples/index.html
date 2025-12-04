@@ -330,7 +330,8 @@
           linepenalty: 10,
           adjdemerits: 10000,
           respectExistingBreaks: true,
-          disableSingleWordDetection: false,
+          disableShortLineDetection: false,
+          shortLineThreshold: 0.5,
           distanceTolerance: 0.5,
           angleTolerance: 0.25,
         };
@@ -904,8 +905,12 @@
             .name("Respect existing breaks")
             .onChange(debouncedRender);
           lineBreakingFolder
-            .add(params, "disableSingleWordDetection")
-            .name("Disable single-word detection")
+            .add(params, "disableShortLineDetection")
+            .name("Disable short line detection")
+            .onChange(debouncedRender);
+          lineBreakingFolder
+            .add(params, "shortLineThreshold", 0.0, 1.0, 0.05)
+            .name("Short line threshold")
             .onChange(debouncedRender);
           lineBreakingFolder
             .add(params, "tolerance", 10, 10000, 100)
@@ -1259,7 +1264,8 @@
                 pretolerance: params.pretolerance,
                 emergencyStretch: params.emergencyStretch,
                 respectExistingBreaks: params.respectExistingBreaks,
-                disableSingleWordDetection: params.disableSingleWordDetection,
+                disableShortLineDetection: params.disableShortLineDetection,
+                shortLineThreshold: params.shortLineThreshold,
                 lefthyphenmin: params.lefthyphenmin,
                 righthyphenmin: params.righthyphenmin,
                 looseness: params.looseness,
