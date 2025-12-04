@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.9] - 2025-12-04
+
+### Added
+
+- Chinese and Japanese now have character-level line breaking / inter-character glue. No breaks before closing punctuation or after opening punctuation
+- Mixed script support
+
+### Changed
+
+- Hyphenation now computed on-demand (second pass only if first pass fails)
+
 ## [0.2.8] - 2025-12-01
 
 ### Changed

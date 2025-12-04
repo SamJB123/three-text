@@ -940,9 +940,9 @@ While `three-text` runs on all modern browsers, performance varies significantly
 
 **Chrome** provides the best experience
 
-**Firefox** also delivers great performance but may exhibit less responsive mouse interactions in WebGL contexts due to the way it handles events
+**Firefox** also delivers great performance but may exhibit less responsive mouse interactions
 
-**Safari** for macOS shows reduced performance, which is likely due to the platform's conservative resource management, particularly around battery life; 120FPS is not acheivable
+**Safari** for macOS shows reduced performance, which is likely due to the platform's conservative resource management; 120FPS is not acheivable
 
 The library was also tested on a Brightsign 223HD, which took a long time to generate the initial geometry but seemed fine after that
 
