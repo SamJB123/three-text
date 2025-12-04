@@ -257,7 +257,8 @@ function App() {
       options: ["left", "center", "right", "justify"],
     },
     respectExistingBreaks: true,
-    disableSingleWordDetection: false,
+    disableShortLineDetection: false,
+    shortLineThreshold: { value: 0.5, min: 0.0, max: 1.0, step: 0.05 },
     tolerance: { value: 200, min: 10, max: 10000, step: 100 }, // TeX plain.tex default
     pretolerance: { value: 100, min: 10, max: 1000, step: 50 }, // TeX plain.tex default
     emergencyStretch: { value: 0, min: 0, max: 1000, step: 50 }, // TeX default
@@ -589,7 +590,8 @@ function App() {
             hyphenate: hyphenationControls.hyphenate,
             language: hyphenationControls.language,
             respectExistingBreaks: lineBreakingControls.respectExistingBreaks,
-            disableSingleWordDetection: lineBreakingControls.disableSingleWordDetection,
+            disableShortLineDetection: lineBreakingControls.disableShortLineDetection,
+            shortLineThreshold: lineBreakingControls.shortLineThreshold,
             tolerance: lineBreakingControls.tolerance,
             pretolerance: lineBreakingControls.pretolerance,
             emergencyStretch: lineBreakingControls.emergencyStretch,

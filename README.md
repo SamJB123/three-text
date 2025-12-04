@@ -395,7 +395,8 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 - **tolerance** (800): Maximum badness for the second pass with hyphenation
 - **emergencyStretch** (0): Additional stretchability for difficult paragraphs
 - **autoEmergencyStretch** (0.1): Emergency stretch as percentage of line width (e.g., 0.1 = 10%). Defaults to 10% for non-hyphenated text
-- **disableSingleWordDetection** (false): Disable automatic prevention of short single-word lines
+- **disableShortLineDetection** (false): Disable automatic prevention of short lines
+- **shortLineThreshold** (0.5): Width ratio threshold for short line detection (0.0 to 1.0)
 
 #### Advanced parameters
 
@@ -416,9 +417,9 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 
 Lower penalty/tolerance values produce tighter spacing but may fail to find acceptable breaks for challenging text
 
-#### Single-word line detection
+#### Short line detection
 
-By default, the library detects and prevents short single-word lines (words occupying less than 50% of the line width on non-final lines) by iteratively applying emergency stretch. This can be disabled if needed:
+By default, the library detects and prevents short lines (lines occupying less than 50% of the target width on non-final lines) by iteratively applying emergency stretch. This can be customized or disabled:
 
 ```javascript
 const text = await Text.create({
@@ -426,7 +427,9 @@ const text = await Text.create({
   font: '/fonts/Font.ttf',
   layout: {
     width: 1000,
-    disableSingleWordDetection: true,
+    shortLineThreshold: 0.6,  // Only flag lines < 60% width (more lenient)
+    // Or disable entirely:
+    // disableShortLineDetection: true,
   },
 });
 ```
@@ -754,9 +757,9 @@ interface LayoutOptions {
   pretolerance?: number; // Maximum badness for first pass (default: 100)
   emergencyStretch?: number; // Additional stretchability for difficult paragraphs
   autoEmergencyStretch?: number; // Emergency stretch as percentage of line width (defaults to 10% for non-hyphenated)
-  disableSingleWordDetection?: boolean; // Disable automatic single-word line prevention (default: false)
-  lefthyphenmin?: number; // Minimum character
-  // s before hyphen (default: 2)
+  disableShortLineDetection?: boolean; // Disable automatic short line prevention (default: false)
+  shortLineThreshold?: number; // Width ratio threshold for short line detection (default: 0.5)
+  lefthyphenmin?: number; // Minimum characters before hyphen (default: 2)
   righthyphenmin?: number; // Minimum characters after hyphen (default: 4)
   linepenalty?: number; // Base penalty per line (default: 10)
   adjdemerits?: number; // Penalty for incompatible fitness classes (default: 10000)
@@ -940,9 +943,9 @@ While `three-text` runs on all modern browsers, performance varies significantly
 
 **Chrome** provides the best experience
 
-**Firefox** also delivers great performance but may exhibit less responsive mouse interactions in WebGL contexts due to the way it handles events
+**Firefox** also delivers great performance but may exhibit less responsive mouse interactions
 
-**Safari** for macOS shows reduced performance, which is likely due to the platform's conservative resource management, particularly around battery life; 120FPS is not acheivable
+**Safari** for macOS shows reduced performance, which is likely due to the platform's conservative resource management; 120FPS is not acheivable
 
 The library was also tested on a Brightsign 223HD, which took a long time to generate the initial geometry but seemed fine after that
 

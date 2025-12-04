@@ -1,17 +1,28 @@
 # Changelog
 
+## [0.2.9] - 2025-12-04
+
+### Added
+
+- Chinese, Japanese, Korean (CJK) now have character-level line breaking / inter-character glue. No breaks before closing punctuation or after opening punctuation
+- Mixed script support (automatic switching between CJK and word-based scripts)
+- Added `shortLineThreshold` parameter to customize short line detection (default: 0.5)
+
+### Changed
+
+- Hyphenation now on-demand (second pass only if first pass fails)
+- Short line detection now checks all lines (not just those with 3 or fewer words)
+- Short line detection threshold reduced from 75% to 50% for better balance
+- Renamed `disableSingleWordDetection` option to `disableShortLineDetection`
+
 ## [0.2.7] - 2025-12-01
 
 ### Added
 
-- Polygonized contour cache to avoid redundant curve subdivision
+- Polygonized contour cache
 - Generic LRU cache in `src/utils/LRUCache.ts`
 - Integration tests with real HarfBuzz and fonts
 - `npm run benchmark` command for performance measurement
-
-### Changed
-
-- Performance logging now includes `reset()` method for benchmark
 
 ## [0.2.6] - 2025-12-01
 

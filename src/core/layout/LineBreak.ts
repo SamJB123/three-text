@@ -190,10 +190,15 @@ export interface LineBreakOptions {
   // Looseness: adjust paragraph length by n lines
   looseness?: number;
 
-  // Disable automatic detection and prevention of short single-word lines
+  // Disable automatic detection and prevention of short lines
   // When enabled (default), iteratively applies emergency stretch to eliminate
-  // isolated words on lines that are less than 50% of the target width.
-  disableSingleWordDetection?: boolean;
+  // lines that are less than 50% of the target width.
+  disableShortLineDetection?: boolean;
+
+  // Threshold for short line detection (0.0 to 1.0, default: 0.5)
+  // Lines with width less than this ratio of the target width are considered problematic
+  // and will trigger additional emergency stretch to push words to the next line.
+  shortLineThreshold?: number;
 }
 
 interface LineBreakContext {
@@ -223,16 +228,16 @@ const INF_BAD = 10000;
 // Non TeX default: emergency stretch for non-hyphenated text (10% of line width)
 const DEFAULT_EMERGENCY_STRETCH_NO_HYPHEN = 0.1;
 
-// Another non TeX default: Single-word line detection thresholds
-const SINGLE_WORD_WIDTH_THRESHOLD = 0.5; // Lines < 50% of width are problematic
-const SINGLE_WORD_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
+// Another non TeX default: Short line detection thresholds
+const SHORT_LINE_WIDTH_THRESHOLD = 0.5; // Lines < 50% of width are problematic
+const SHORT_LINE_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
 
 export class LineBreak {
   // Calculate badness according to TeX's formula (tex.web §108, line 2337)
   // Given t (desired adjustment) and s (available stretch/shrink)
   // Returns approximation to 100(t/s)³, representing how "bad" a line is
   // Constants are derived from TeX's fixed-point arithmetic:
-  //   297³ ≈ 100×2¹⁸, so (297t/s)³/2¹⁸ ≈ 100(t/s)³
+  // 297³ ≈ 100×2¹⁸, so (297t/s)³/2¹⁸ ≈ 100(t/s)³
   private static badness(t: number, s: number): number {
     if (t === 0) return 0;
     if (s <= 0) return INF_BAD;
@@ -303,8 +308,8 @@ export class LineBreak {
     return filteredPoints;
   }
 
-  // Converts text into items (boxes, glues, penalties) for line breaking.
-  // The measureText function should return widths that include any letter spacing.
+  // Converts text into items (boxes, glues, penalties) for line breaking
+  // The measureText function should return widths that include any letter spacing
   public static itemizeText(
     text: string,
     measureText: (text: string) => number, // function to measure text width
@@ -351,6 +356,187 @@ export class LineBreak {
     return items;
   }
 
+  // Chinese, Japanese, and Korean character ranges
+  public static isCJK(char: string): boolean {
+    const code = char.codePointAt(0);
+    if (code === undefined) return false;
+
+    return (
+      // CJK Unified Ideographs
+      (code >= 0x4e00 && code <= 0x9fff) ||
+      // CJK Extension A
+      (code >= 0x3400 && code <= 0x4dbf) ||
+      // CJK Extension B
+      (code >= 0x20000 && code <= 0x2a6df) ||
+      // CJK Extension C
+      (code >= 0x2a700 && code <= 0x2b73f) ||
+      // CJK Extension D
+      (code >= 0x2b740 && code <= 0x2b81f) ||
+      // CJK Extension E
+      (code >= 0x2b820 && code <= 0x2ceaf) ||
+      // CJK Compatibility Ideographs
+      (code >= 0xf900 && code <= 0xfaff) ||
+      // Hiragana
+      (code >= 0x3040 && code <= 0x309f) ||
+      // Katakana
+      (code >= 0x30a0 && code <= 0x30ff) ||
+      // Hangul Syllables
+      (code >= 0xac00 && code <= 0xd7af) ||
+      // Hangul Jamo
+      (code >= 0x1100 && code <= 0x11ff) ||
+      // Hangul Compatibility Jamo
+      (code >= 0x3130 && code <= 0x318f) ||
+      // Hangul Jamo Extended-A
+      (code >= 0xa960 && code <= 0xa97f) ||
+      // Hangul Jamo Extended-B
+      (code >= 0xd7b0 && code <= 0xd7ff) ||
+      // Halfwidth and Fullwidth Forms (Korean)
+      (code >= 0xffa0 && code <= 0xffdc)
+    );
+  }
+
+  // Closing punctuation where line breaks are prohibited (UAX #14 LB30, JIS X 4051)
+  public static isCJClosingPunctuation(char: string): boolean {
+    const code = char.charCodeAt(0);
+    return (
+      code === 0x3001 || // 、
+      code === 0x3002 || // 。
+      code === 0xff0c || // ，
+      code === 0xff0e || // ．
+      code === 0xff1a || // ：
+      code === 0xff1b || // ；
+      code === 0xff01 || // ！
+      code === 0xff1f || // ？
+      code === 0xff09 || // ）
+      code === 0x3011 || // 】
+      code === 0xff5d || // ｝
+      code === 0x300d || // 」
+      code === 0x300f || // 』
+      code === 0x3009 || // 〉
+      code === 0x300b || // 》
+      code === 0x3015 || // 〕
+      code === 0x3017 || // 〗
+      code === 0x3019 || // 〙
+      code === 0x301b || // 〛
+      code === 0x30fc || // ー
+      code === 0x2014 || // —
+      code === 0x2026 || // …
+      code === 0x2025 // ‥
+    );
+  }
+
+  // Opening punctuation where line breaks are prohibited (UAX #14 LB30a, JIS X 4051)
+  public static isCJOpeningPunctuation(char: string): boolean {
+    const code = char.charCodeAt(0);
+    return (
+      code === 0xff08 || // （
+      code === 0x3010 || // 【
+      code === 0xff5b || // ｛
+      code === 0x300c || // 「
+      code === 0x300e || // 『
+      code === 0x3008 || // 〈
+      code === 0x300a || // 《
+      code === 0x3014 || // 〔
+      code === 0x3016 || // 〖
+      code === 0x3018 || // 〘
+      code === 0x301a // 〚
+    );
+  }
+
+  public static isCJPunctuation(char: string): boolean {
+    return (
+      this.isCJClosingPunctuation(char) || this.isCJOpeningPunctuation(char)
+    );
+  }
+
+  // CJK (Chinese/Japanese/Korean) character-level itemization with inter-character glue
+  private static itemizeCJKText(
+    text: string,
+    measureText: (text: string) => number,
+    context: LineBreakContext | undefined,
+    startOffset: number = 0,
+    glueParams?: { width: number; stretch: number; shrink: number }
+  ): Item[] {
+    const items: Item[] = [];
+    const chars = Array.from(text);
+    let textPosition = startOffset;
+
+    // Inter-character glue parameters
+    let glueWidth: number;
+    let glueStretch: number;
+    let glueShrink: number;
+    
+    if (glueParams) {
+      glueWidth = glueParams.width;
+      glueStretch = glueParams.stretch;
+      glueShrink = glueParams.shrink;
+    } else {
+      const baseCharWidth = measureText('字');
+      glueWidth = 0;
+      glueStretch = baseCharWidth * 0.04;
+      glueShrink = baseCharWidth * 0.04;
+    }
+
+    for (let i = 0; i < chars.length; i++) {
+      const char = chars[i];
+      const nextChar = i < chars.length - 1 ? chars[i + 1] : null;
+
+      if (/\s/.test(char)) {
+        const width = measureText(char);
+        items.push({
+          type: ItemType.GLUE,
+          width,
+          stretch: width * SPACE_STRETCH_RATIO,
+          shrink: width * SPACE_SHRINK_RATIO,
+          text: char,
+          originIndex: textPosition
+        } as Glue);
+        textPosition += char.length;
+        continue;
+      }
+
+      items.push({
+        type: ItemType.BOX,
+        width: measureText(char),
+        text: char,
+        originIndex: textPosition
+      } as Box);
+
+      textPosition += char.length;
+
+      // Glue after a box creates a break opportunity
+      // Must not add glue where breaks are prohibited by Chinese/Japanese line breaking rules
+      if (nextChar && !/\s/.test(nextChar)) {
+        let canBreak = true;
+
+        if (this.isCJClosingPunctuation(nextChar)) {
+          canBreak = false;
+        }
+
+        if (this.isCJOpeningPunctuation(char)) {
+          canBreak = false;
+        }
+
+        // Avoid stretch between consecutive punctuation (？" or 。」)
+        const isPunctPair =
+          this.isCJPunctuation(char) && this.isCJPunctuation(nextChar);
+
+        if (canBreak && !isPunctPair) {
+          items.push({
+            type: ItemType.GLUE,
+            width: glueWidth,
+            stretch: glueStretch,
+            shrink: glueShrink,
+            text: '',
+            originIndex: textPosition
+          } as Glue);
+        }
+      }
+    }
+
+    return items;
+  }
+
   private static itemizeParagraph(
     text: string,
     measureText: (text: string) => number,
@@ -362,16 +548,96 @@ export class LineBreak {
     context: LineBreakContext | undefined
   ): Item[] {
     const items: Item[] = [];
-    // First split into words and spaces
+    const chars = Array.from(text);
+
+    // Calculate CJK glue parameters once for consistency across all segments
+    const baseCharWidth = measureText('字');
+    const cjkGlueParams = {
+      width: 0,
+      stretch: baseCharWidth * 0.04,
+      shrink: baseCharWidth * 0.04
+    };
+
+    let buffer = '';
+    let bufferStart = 0;
+    let bufferScript: 'cjk' | 'word' | null = null;
+    let textPosition = 0;
+
+    const flushBuffer = () => {
+      if (buffer.length === 0) return;
+
+      if (bufferScript === 'cjk') {
+        const cjkItems = this.itemizeCJKText(
+          buffer,
+          measureText,
+          context,
+          bufferStart,
+          cjkGlueParams
+        );
+        items.push(...cjkItems);
+      } else {
+        const wordItems = this.itemizeWordBased(
+          buffer,
+          bufferStart,
+          measureText,
+          hyphenate,
+          language,
+          availablePatterns,
+          lefthyphenmin,
+          righthyphenmin,
+          context
+        );
+        items.push(...wordItems);
+      }
+
+      buffer = '';
+      bufferScript = null;
+    };
+
+    for (let i = 0; i < chars.length; i++) {
+      const char = chars[i];
+      const isCJKChar = this.isCJK(char);
+      const currentScript = isCJKChar ? 'cjk' : 'word';
+
+      if (bufferScript !== null && bufferScript !== currentScript) {
+        flushBuffer();
+        bufferStart = textPosition;
+      }
+
+      if (bufferScript === null) {
+        bufferScript = currentScript;
+        bufferStart = textPosition;
+      }
+
+      buffer += char;
+      textPosition += char.length;
+    }
+
+    flushBuffer();
+    return items;
+  }
+
+  // Word-based itemization for alphabetic scripts (Latin, Cyrillic, Greek, etc.)
+  private static itemizeWordBased(
+    text: string,
+    startOffset: number,
+    measureText: (text: string) => number,
+    hyphenate: boolean,
+    language: string,
+    availablePatterns: HyphenationPatternsMap | undefined,
+    lefthyphenmin: number,
+    righthyphenmin: number,
+    context: LineBreakContext | undefined
+  ): Item[] {
+    const items: Item[] = [];
     const tokens = text.match(/\S+|\s+/g) || [];
     let currentIndex = 0;
 
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
-      const tokenStartIndex = currentIndex;
+      const tokenStartIndex = startOffset + currentIndex;
 
       if (/\s+/.test(token)) {
-        // Handle spaces
         const width = measureText(token);
         items.push({
           type: ItemType.GLUE,
@@ -383,24 +649,20 @@ export class LineBreak {
         } as Glue);
         currentIndex += token.length;
       } else {
-        // Process word, splitting on explicit hyphens
-        // Split on hyphens while keeping them in the result
         const segments = token.split(/(-)/);
         let segmentIndex = tokenStartIndex;
 
         for (let j = 0; j < segments.length; j++) {
           const segment = segments[j];
-
-          if (!segment) continue; // Skip empty segments
+          if (!segment) continue;
 
           if (segment === '-') {
-            // Handle explicit hyphen as discretionary break
             items.push({
               type: ItemType.DISCRETIONARY,
-              width: measureText('-'), // Width of hyphen in normal flow
-              preBreak: '-', // Hyphen appears before break
-              postBreak: '', // Nothing after break
-              noBreak: '-', // Hyphen if no break
+              width: measureText('-'),
+              preBreak: '-',
+              postBreak: '',
+              noBreak: '-',
               preBreakWidth: measureText('-'),
               penalty: context?.exHyphenPenalty ?? DEFAULT_EX_HYPHEN_PENALTY,
               flagged: true,
@@ -409,8 +671,6 @@ export class LineBreak {
             } as Discretionary);
             segmentIndex += 1;
           } else {
-            // Process non-hyphen segment
-            // First handle soft hyphens (U+00AD)
             if (segment.includes('\u00AD')) {
               const partsWithMarkers = segment.split('\u00AD');
               let runningIndex = 0;
@@ -428,24 +688,24 @@ export class LineBreak {
                 if (k < partsWithMarkers.length - 1) {
                   items.push({
                     type: ItemType.DISCRETIONARY,
-                    width: 0, // No width in normal flow
-                    preBreak: '-', // Hyphen appears before break
-                    postBreak: '', // Nothing after break
-                    noBreak: '', // Nothing if no break (word continues)
+                    width: 0,
+                    preBreak: '-',
+                    postBreak: '',
+                    noBreak: '',
                     preBreakWidth: measureText('-'),
                     penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
                     flagged: true,
                     text: '',
                     originIndex: segmentIndex + runningIndex
                   } as Discretionary);
-                  runningIndex += 1; // Account for the soft hyphen character
+                  runningIndex += 1;
                 }
               }
             } else if (
               hyphenate &&
-              segment.length >= lefthyphenmin + righthyphenmin
+              segment.length >= lefthyphenmin + righthyphenmin &&
+              /^\p{L}+$/u.test(segment)
             ) {
-              // Apply hyphenation patterns only to segments between explicit hyphens
               const hyphenPoints = LineBreak.findHyphenationPoints(
                 segment,
                 language,
@@ -456,7 +716,6 @@ export class LineBreak {
 
               if (hyphenPoints.length > 0) {
                 let lastPoint = 0;
-
                 for (const point of hyphenPoints) {
                   const part = segment.substring(lastPoint, point);
                   items.push({
@@ -467,10 +726,10 @@ export class LineBreak {
                   } as Box);
                   items.push({
                     type: ItemType.DISCRETIONARY,
-                    width: 0, // No width in normal flow
-                    preBreak: '-', // Hyphen appears before break
-                    postBreak: '', // Nothing after break
-                    noBreak: '', // Nothing if no break (word continues)
+                    width: 0,
+                    preBreak: '-',
+                    postBreak: '',
+                    noBreak: '',
                     preBreakWidth: measureText('-'),
                     penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
                     flagged: true,
@@ -479,7 +738,6 @@ export class LineBreak {
                   } as Discretionary);
                   lastPoint = point;
                 }
-
                 const lastPart = segment.substring(lastPoint);
                 items.push({
                   type: ItemType.BOX,
@@ -488,7 +746,6 @@ export class LineBreak {
                   originIndex: segmentIndex + lastPoint
                 } as Box);
               } else {
-                // No hyphenation points, add as single box
                 items.push({
                   type: ItemType.BOX,
                   width: measureText(segment),
@@ -497,7 +754,6 @@ export class LineBreak {
                 } as Box);
               }
             } else {
-              // No hyphenation, add as single box
               items.push({
                 type: ItemType.BOX,
                 width: measureText(segment),
@@ -514,35 +770,30 @@ export class LineBreak {
     return items;
   }
 
-  // Detect if breakpoints create problematic single-word lines
-  private static hasSingleWordLines(
+  // Detect if breakpoints create problematic short lines
+  private static hasShortLines(
     items: Item[],
     breakpoints: number[],
-    lineWidth: number
+    lineWidth: number,
+    threshold: number
   ): boolean {
     // Check each line segment (except the last, which can naturally be short)
     let lineStart = 0;
 
     for (let i = 0; i < breakpoints.length - 1; i++) {
       const breakpoint = breakpoints[i];
-
-      // Count glue items (spaces) between line start and breakpoint
-      let glueCount = 0;
       let totalWidth = 0;
 
       for (let j = lineStart; j < breakpoint; j++) {
-        if (items[j].type === ItemType.GLUE) {
-          glueCount++;
-        }
         if (items[j].type !== ItemType.PENALTY) {
           totalWidth += items[j].width;
         }
       }
 
-      // Single word line = no glue items
-      if (glueCount === 0 && totalWidth > 0) {
+      // Check if line is narrow relative to target width
+      if (totalWidth > 0) {
         const widthRatio = totalWidth / lineWidth;
-        if (widthRatio < SINGLE_WORD_WIDTH_THRESHOLD) {
+        if (widthRatio < threshold) {
           return true;
         }
       }
@@ -583,7 +834,8 @@ export class LineBreak {
       exhyphenpenalty = DEFAULT_EX_HYPHEN_PENALTY,
       doublehyphendemerits = DEFAULT_DOUBLE_HYPHEN_DEMERITS,
       looseness = 0,
-      disableSingleWordDetection = false
+      disableShortLineDetection = false,
+      shortLineThreshold = SHORT_LINE_WIDTH_THRESHOLD
     } = options;
 
     // Handle multiple paragraphs by processing each independently
@@ -676,11 +928,11 @@ export class LineBreak {
       ];
     }
 
-    // Itemize text once, including all potential hyphenation points
+    // Itemize without hyphenation first (TeX approach: only compute if needed)
     const allItems = LineBreak.itemizeText(
       text,
       measureText,
-      useHyphenation,
+      false,
       language,
       hyphenationPatterns,
       lefthyphenmin,
@@ -692,31 +944,20 @@ export class LineBreak {
       return [];
     }
 
-    // Iteratively increase emergency stretch to eliminate short single-word lines.
-    // Post-processing approach preserves TeX algorithm integrity while itemization
-    // (the expensive part) happens once
     const MAX_ITERATIONS = 5;
     let iteration = 0;
     let currentEmergencyStretch = initialEmergencyStretch;
     let resultLines: LineInfo[] | null = null;
-    const singleWordDetectionEnabled = !disableSingleWordDetection;
+    const shortLineDetectionEnabled = !disableShortLineDetection;
 
     while (iteration < MAX_ITERATIONS) {
-      // Three-pass approach for optimal line breaking:
-      // First pass: Try without hyphenation using pretolerance (fast)
-      // Second pass: Enable hyphenation if available, use tolerance (quality)
-      // Final pass: Emergency stretch for difficult paragraphs (last resort)
+      // Three-pass approach matching TeX:
+      // First pass: without hyphenation (pretolerance)
+      // Second pass: with hyphenation, only if first pass fails (tolerance)
+      // Emergency pass: additional stretch as last resort
 
       // First pass: no hyphenation
-      let currentItems = useHyphenation
-        ? allItems.filter(
-            (item) =>
-              item.type !== ItemType.DISCRETIONARY ||
-              (item as Discretionary).penalty !==
-                (context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY)
-          )
-        : allItems;
-
+      let currentItems = allItems;
       let breaks = LineBreak.findBreakpoints(
         currentItems,
         width,
@@ -727,9 +968,19 @@ export class LineBreak {
         context
       );
 
-      // Second pass: with hyphenation
+      // Second pass: compute hyphenation only if needed
       if (breaks.length === 0 && useHyphenation) {
-        currentItems = allItems;
+        const itemsWithHyphenation = LineBreak.itemizeText(
+          text,
+          measureText,
+          true,
+          language,
+          hyphenationPatterns,
+          lefthyphenmin,
+          righthyphenmin,
+          context
+        );
+        currentItems = itemsWithHyphenation;
         breaks = LineBreak.findBreakpoints(
           currentItems,
           width,
@@ -741,9 +992,8 @@ export class LineBreak {
         );
       }
 
-      // Final pass: emergency stretch
+      // Emergency pass: use currentItems as-is (preserves hyphenation from pass 2 if it ran)
       if (breaks.length === 0) {
-        currentItems = allItems;
         breaks = LineBreak.findBreakpoints(
           currentItems,
           width,
@@ -783,15 +1033,15 @@ export class LineBreak {
           context
         );
 
-        // Check for single-word lines if detection is enabled
+        // Check for short lines if detection is enabled
         if (
-          singleWordDetectionEnabled &&
+          shortLineDetectionEnabled &&
           breaks.length > 1 &&
-          LineBreak.hasSingleWordLines(currentItems, breaks, width)
+          LineBreak.hasShortLines(currentItems, breaks, width, shortLineThreshold)
         ) {
           // Increase emergency stretch and try again
           currentEmergencyStretch +=
-            width * SINGLE_WORD_EMERGENCY_STRETCH_INCREMENT;
+            width * SHORT_LINE_EMERGENCY_STRETCH_INCREMENT;
           iteration++;
           continue;
         }
@@ -1281,6 +1531,8 @@ export class LineBreak {
       widths[i + 1] = widths[i] + item.width;
 
       if (item.type === ItemType.PENALTY) {
+        stretches[i + 1] = stretches[i];
+        shrinks[i + 1] = shrinks[i];
         minWidths[i + 1] = minWidths[i];
       } else if (item.type === ItemType.GLUE) {
         const glue = item as Glue;

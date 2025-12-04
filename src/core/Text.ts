@@ -430,7 +430,8 @@ export class Text {
       exhyphenpenalty,
       doublehyphendemerits,
       looseness,
-      disableSingleWordDetection
+      disableShortLineDetection,
+      shortLineThreshold
     } = layout;
 
     let widthInFontUnits: number | undefined;
@@ -464,7 +465,8 @@ export class Text {
       exhyphenpenalty,
       doublehyphendemerits,
       looseness,
-      disableSingleWordDetection,
+      disableShortLineDetection,
+      shortLineThreshold,
       letterSpacing
     });
 

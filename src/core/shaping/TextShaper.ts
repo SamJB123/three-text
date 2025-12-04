@@ -13,6 +13,7 @@ import { TextMeasurer } from './TextMeasurer';
 import { perfLogger } from '../../utils/PerformanceLogger';
 import { SPACE_STRETCH_RATIO, SPACE_SHRINK_RATIO } from '../layout/constants';
 import { convertFontFeaturesToString } from './fontFeatures';
+import { LineBreak } from '../layout/LineBreak';
 
 export interface ShapedResult {
   geometry: any;
@@ -104,10 +105,12 @@ export class TextShaper {
 
     buffer.addText(lineInfo.text);
     buffer.guessSegmentProperties();
-    
-    const featuresString = convertFontFeaturesToString(this.loadedFont.fontFeatures);
+
+    const featuresString = convertFontFeaturesToString(
+      this.loadedFont.fontFeatures
+    );
     this.loadedFont.hb.shape(this.loadedFont.font, buffer, featuresString);
-    
+
     const glyphInfos: HarfBuzzGlyph[] = buffer.json(this.loadedFont.font);
     buffer.destroy();
 
@@ -125,6 +128,8 @@ export class TextShaper {
       align,
       letterSpacing
     );
+
+    const cjkAdjustment = this.calculateCJKAdjustment(lineInfo, align);
 
     for (let i = 0; i < glyphInfos.length; i++) {
       const glyph = glyphInfos[i];
@@ -181,6 +186,36 @@ export class TextShaper {
       if (isWhitespace) {
         cursor.x += spaceAdjustment;
       }
+
+      // CJK glue adjustment (must match exactly where LineBreak adds glue)
+      if (cjkAdjustment !== 0 && i < glyphInfos.length - 1 && !isWhitespace) {
+        const currentChar = lineInfo.text[glyph.cl];
+        const nextGlyph = glyphInfos[i + 1];
+        const nextChar = lineInfo.text[nextGlyph.cl];
+
+        const isCJKChar = LineBreak.isCJK(currentChar);
+        const nextIsCJKChar = nextChar && LineBreak.isCJK(nextChar);
+
+        if (isCJKChar && nextIsCJKChar) {
+          let shouldApply = true;
+          
+          if (LineBreak.isCJClosingPunctuation(nextChar)) {
+            shouldApply = false;
+          }
+          
+          if (LineBreak.isCJOpeningPunctuation(currentChar)) {
+            shouldApply = false;
+          }
+          
+          if (LineBreak.isCJPunctuation(currentChar) && LineBreak.isCJPunctuation(nextChar)) {
+            shouldApply = false;
+          }
+          
+          if (shouldApply) {
+            cursor.x += cjkAdjustment;
+          }
+        }
+      }
     }
 
     if (currentClusterGlyphs.length > 0) {
@@ -228,6 +263,28 @@ export class TextShaper {
     }
 
     return spaceAdjustment;
+  }
+
+  private calculateCJKAdjustment(lineInfo: LineInfo, align: string): number {
+    if (
+      lineInfo.adjustmentRatio === undefined ||
+      align !== 'justify' ||
+      lineInfo.isLastLine
+    ) {
+      return 0;
+    }
+
+    const baseCharWidth = this.loadedFont.upem;
+    const glueStretch = baseCharWidth * 0.04;
+    const glueShrink = baseCharWidth * 0.04;
+
+    if (lineInfo.adjustmentRatio > 0) {
+      return lineInfo.adjustmentRatio * glueStretch;
+    } else if (lineInfo.adjustmentRatio < 0) {
+      return lineInfo.adjustmentRatio * glueShrink;
+    }
+
+    return 0;
   }
 
   public clearCache(): void {

@@ -56,7 +56,7 @@ describe.runIf(process.env.THREE_TEXT_LOG === 'true')(
         };
 
         // Cold runs – first few passes through the pipeline in this process
-        perfLogger.reset();
+        perfLogger.clear();
         for (let i = 0; i < coldIterations; i++) {
           // eslint-disable-next-line no-await-in-loop
           await Text.create(config);
@@ -66,7 +66,7 @@ describe.runIf(process.env.THREE_TEXT_LOG === 'true')(
         perfLogger.printSummary();
 
         // Warm runs – V8 and caches are already hot
-        perfLogger.reset();
+        perfLogger.clear();
 
         for (let i = 0; i < warmIterations; i++) {
           // eslint-disable-next-line no-await-in-loop
