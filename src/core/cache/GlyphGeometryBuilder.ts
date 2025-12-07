@@ -1,5 +1,5 @@
 import { Vec2, Vec3, Box3 as Box3Core } from '../vectors';
-import { GlyphCache, GlyphData, GlyphInstance } from './GlyphCache';
+import { GlyphCache, GlyphData } from './GlyphCache';
 import { perfLogger } from '../../utils/PerformanceLogger';
 import {
   Path,
@@ -16,6 +16,9 @@ import { DrawCallbackHandler } from '../shaping/DrawCallbacks';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
 import { HarfBuzzGlyph } from '../types';
 import { LRUCache } from '../../utils/LRUCache';
+
+const CONTOUR_CACHE_MAX_ENTRIES = 1000;
+const WORD_CACHE_MAX_ENTRIES = 1000;
 
 export interface InstancedTextGeometry {
   vertices: Float32Array;
@@ -37,7 +40,7 @@ export class GlyphGeometryBuilder {
   private collector: GlyphContourCollector;
   private drawCallbacks: DrawCallbackHandler;
   private loadedFont: LoadedFont;
-  private wordCache = new Map<string, GlyphData>();
+  private wordCache: LRUCache<string, GlyphData>;
   private contourCache: LRUCache<number, GlyphContours>;
 
   constructor(cache: GlyphCache, loadedFont: LoadedFont) {
@@ -50,13 +53,22 @@ export class GlyphGeometryBuilder {
     this.drawCallbacks = new DrawCallbackHandler();
     this.drawCallbacks.createDrawFuncs(this.loadedFont, this.collector);
     this.contourCache = new LRUCache<number, GlyphContours>({
-      maxEntries: 1000,
+      maxEntries: CONTOUR_CACHE_MAX_ENTRIES,
       calculateSize: (contours) => {
         let size = 0;
         for (const path of contours.paths) {
           size += path.points.length * 16; // Vec2 = 2 floats * 8 bytes
         }
         return size + 64; // bounds overhead
+      }
+    });
+    this.wordCache = new LRUCache<string, GlyphData>({
+      maxEntries: WORD_CACHE_MAX_ENTRIES,
+      calculateSize: (data) => {
+        let size = data.vertices.length * 4;
+        size += data.normals.length * 4;
+        size += data.indices.length * data.indices.BYTES_PER_ELEMENT;
+        return size;
       }
     });
   }

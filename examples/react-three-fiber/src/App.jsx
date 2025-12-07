@@ -70,50 +70,13 @@ function App() {
   const textMeshRef = useRef();
   const renderStartTimeRef = useRef(null);
 
-  const handleFontLoad = async (fontBuffer, fontName) => {
+  const handleFontLoad = (fontBuffer, fontName) => {
     setCustomFont({ buffer: fontBuffer, name: fontName });
     setCurrentFontName(fontName);
-
-    // Detect variation axes by creating a small text sample
-    // Note: This uses the imperative API - normally you'd use onLoad callback instead
-    const tempResult = await Text.create({
-      text: "temp",
-      font: fontBuffer,
-      size: 12
-    });
-    const loadedFont = tempResult.getLoadedFont();
-    const axes = loadedFont?.variationAxes || null;
-    
-    // Always update axes state (this will be null for non-variable fonts)
-    setVariationAxes(axes);
-
-    // Reset variations to default (or empty for non-variable fonts)
-    const defaultVariations = {};
-    if (axes) {
-      for (const [tag, axisInfo] of Object.entries(axes)) {
-        defaultVariations[tag] = axisInfo.default;
-      }
-    }
-    setFontVariations(defaultVariations);
-    
-    // Extract available OpenType features
-    const features = loadedFont?.availableFeatures || null;
-    const names = loadedFont?.featureNames || {};
-    setAvailableFeatures(features);
-    setFeatureNames(names);
-    
-    // Reset features to defaults
-    const defaultFeatures = {};
-    // HarfBuzz default-on features (horizontal text)
-    const defaultEnabled = ['abvm', 'blwm', 'ccmp', 'locl', 'mark', 'mkmk', 'rlig', 'calt', 'clig', 'curs', 'dist', 'kern', 'liga', 'rclt'];
-    if (features) {
-      features.forEach(tag => {
-        if (defaultEnabled.includes(tag)) {
-          defaultFeatures[tag] = true;
-        }
-      });
-    }
-    setFontFeatures(defaultFeatures);
+    setVariationAxes(null);
+    setFontVariations({});
+    setAvailableFeatures(null);
+    setFontFeatures({});
   };
 
   const handleUploadClick = useCallback(() => {
@@ -150,36 +113,6 @@ function App() {
     setFontControl({ "Current font": currentFontName });
   }, [currentFontName]);
 
-  useEffect(() => {
-    const detectDefaultFontFeatures = async () => {
-      const tempResult = await Text.create({
-        text: "temp",
-        font: "./fonts/NimbusSanL-Reg.woff",
-        size: 12
-      });
-      const loadedFont = tempResult.getLoadedFont();
-      const features = loadedFont?.availableFeatures || null;
-      const names = loadedFont?.featureNames || {};
-      
-      if (features && features.length > 0) {
-        setAvailableFeatures(features);
-        setFeatureNames(names);
-        
-        // Initialize default features
-        // HarfBuzz default-on features (horizontal text)
-    const defaultEnabled = ['abvm', 'blwm', 'ccmp', 'locl', 'mark', 'mkmk', 'rlig', 'calt', 'clig', 'curs', 'dist', 'kern', 'liga', 'rclt'];
-        const defaults = {};
-        features.forEach(tag => {
-          if (defaultEnabled.includes(tag)) {
-            defaults[tag] = true;
-          }
-        });
-        setFontFeatures(defaults);
-      }
-    };
-    
-    detectDefaultFontFeatures();
-  }, []);
 
   const [textControls] = useControls(
     "Text",
@@ -491,13 +424,39 @@ function App() {
       setMaxDiagonal(maxD);
     }
 
+    const loadedFont = info.getLoadedFont();
+    if (loadedFont) {
+      const axes = loadedFont.variationAxes || null;
+      const features = loadedFont.availableFeatures || null;
+      const names = loadedFont.featureNames || {};
+      
+      if (axes && !variationAxes) {
+        setVariationAxes(axes);
+        const defaultVariations = {};
+        for (const [tag, axisInfo] of Object.entries(axes)) {
+          defaultVariations[tag] = axisInfo.default;
+        }
+        setFontVariations(defaultVariations);
+      }
+      
+      if (features && features.length > 0 && !availableFeatures) {
+        setAvailableFeatures(features);
+        setFeatureNames(names);
+        
+        const defaultEnabled = ['abvm', 'blwm', 'ccmp', 'locl', 'mark', 'mkmk', 'rlig', 'calt', 'clig', 'curs', 'dist', 'kern', 'liga', 'rclt'];
+        const defaults = {};
+        features.forEach(tag => {
+          if (defaultEnabled.includes(tag)) {
+            defaults[tag] = true;
+          }
+        });
+        setFontFeatures(defaults);
+      }
+    }
+
     const triangles = info?.stats?.trianglesGenerated;
-    const renderTime = renderStartTimeRef.current 
-      ? Math.round(performance.now() - renderStartTimeRef.current)
-      : null;
-    
     const message = triangles 
-      ? `${triangles.toLocaleString()} triangles${renderTime ? ` in ${renderTime}ms` : ''}`
+      ? `${triangles.toLocaleString()} triangles`
       : "Ready";
     updateStatus(message, "ready");
   };
@@ -505,12 +464,6 @@ function App() {
   const handleError = (error) => {
     updateStatus(`Error: ${error.message}`, "error");
   };
-
-  useEffect(() => {
-    // This effect runs whenever text generation starts
-    renderStartTimeRef.current = performance.now();
-    updateStatus("Rendering text...", "loading");
-  }, [textControls.text, fontVariations, optimizationControls]);
 
   return (
     <>

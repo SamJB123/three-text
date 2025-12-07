@@ -26,6 +26,65 @@ export interface ThreeTextGeometryInfo
   getCacheStatistics(): any;
   clearCache(): void;
   measureTextWidth(text: string, letterSpacing?: number): number;
+  update(options: Partial<TextOptions>): Promise<ThreeTextGeometryInfo>;
+}
+
+function convertToThree(result: any): ThreeTextGeometryInfo {
+  // Create BufferGeometry from raw arrays
+  const geometry = new BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new Float32BufferAttribute(result.vertices, 3)
+  );
+  geometry.setAttribute(
+    'normal',
+    new Float32BufferAttribute(result.normals, 3)
+  );
+  geometry.setIndex(new Uint32BufferAttribute(result.indices, 1));
+
+  // Add optional color attribute (only if provided)
+  if (result.colors) {
+    geometry.setAttribute(
+      'color',
+      new Float32BufferAttribute(result.colors, 3)
+    );
+  }
+
+  if (result.glyphAttributes) {
+    geometry.setAttribute(
+      'glyphCenter',
+      new Float32BufferAttribute(result.glyphAttributes.glyphCenter, 3)
+    );
+    geometry.setAttribute(
+      'glyphIndex',
+      new Float32BufferAttribute(result.glyphAttributes.glyphIndex, 1)
+    );
+    geometry.setAttribute(
+      'glyphLineIndex',
+      new Float32BufferAttribute(result.glyphAttributes.glyphLineIndex, 1)
+    );
+  }
+
+  geometry.computeBoundingBox();
+
+  // Return Three.js specific interface with utility methods
+  return {
+    geometry,
+    glyphs: result.glyphs,
+    planeBounds: result.planeBounds,
+    stats: result.stats,
+    query: result.query,
+    coloredRanges: result.coloredRanges,
+    // Pass through utility methods from core
+    getLoadedFont: result.getLoadedFont,
+    getCacheStatistics: result.getCacheStatistics,
+    clearCache: result.clearCache,
+    measureTextWidth: result.measureTextWidth,
+    update: async (newOptions: Partial<TextOptions>) => {
+      const newCoreResult = await result.update(newOptions);
+      return convertToThree(newCoreResult);
+    }
+  };
 }
 
 export class Text {
@@ -39,58 +98,7 @@ export class Text {
   // Main API - wraps core result in BufferGeometry
   static async create(options: TextOptions): Promise<ThreeTextGeometryInfo> {
     const coreResult = await TextCore.create(options);
-
-    // Create BufferGeometry from raw arrays
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new Float32BufferAttribute(coreResult.vertices, 3)
-    );
-    geometry.setAttribute(
-      'normal',
-      new Float32BufferAttribute(coreResult.normals, 3)
-    );
-    geometry.setIndex(new Uint32BufferAttribute(coreResult.indices, 1));
-
-    // Add optional color attribute (only if provided)
-    if (coreResult.colors) {
-      geometry.setAttribute(
-        'color',
-        new Float32BufferAttribute(coreResult.colors, 3)
-      );
-    }
-
-    if (coreResult.glyphAttributes) {
-      geometry.setAttribute(
-        'glyphCenter',
-        new Float32BufferAttribute(coreResult.glyphAttributes.glyphCenter, 3)
-      );
-      geometry.setAttribute(
-        'glyphIndex',
-        new Float32BufferAttribute(coreResult.glyphAttributes.glyphIndex, 1)
-      );
-      geometry.setAttribute(
-        'glyphLineIndex',
-        new Float32BufferAttribute(coreResult.glyphAttributes.glyphLineIndex, 1)
-      );
-    }
-
-    geometry.computeBoundingBox();
-
-    // Return Three.js specific interface with utility methods
-    return {
-      geometry,
-      glyphs: coreResult.glyphs,
-      planeBounds: coreResult.planeBounds,
-      stats: coreResult.stats,
-      query: coreResult.query,
-      coloredRanges: coreResult.coloredRanges,
-      // Pass through utility methods from core
-      getLoadedFont: coreResult.getLoadedFont,
-      getCacheStatistics: coreResult.getCacheStatistics,
-      clearCache: coreResult.clearCache,
-      measureTextWidth: coreResult.measureTextWidth
-    };
+    return convertToThree(coreResult);
   }
 }
 

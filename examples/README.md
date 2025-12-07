@@ -83,6 +83,11 @@ Variable fonts automatically expose sliders for each axis (weight, width, etc)
 
   const mesh = new THREE.Mesh(text.geometry, material);
   scene.add(mesh);
+  
+  // Update text later:
+  const updated = await text.update({ text: 'New text' });
+  mesh.geometry.dispose();
+  mesh.geometry = updated.geometry;
 </script>
 ```
 
