@@ -191,7 +191,7 @@ function App() {
     },
     respectExistingBreaks: true,
     disableShortLineDetection: false,
-    shortLineThreshold: { value: 0.5, min: 0.0, max: 1.0, step: 0.05 },
+    shortLineThreshold: { value: 0.7, min: 0.0, max: 1.0, step: 0.05 },
     tolerance: { value: 200, min: 10, max: 10000, step: 100 }, // TeX plain.tex default
     pretolerance: { value: 100, min: 10, max: 1000, step: 50 }, // TeX plain.tex default
     emergencyStretch: { value: 0, min: 0, max: 1000, step: 50 }, // TeX default

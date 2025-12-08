@@ -1,12 +1,18 @@
 # Changelog
 
-## [0.2.10] - 2025-12-07
+## [0.2.11] - 2025-12-08
+
+### Fixed
+
+- `LineBreak.ts`: Default short line detection threshold increased from 50% to 70% for better balance
+
+## [0.2.10] - 2025-12-08
 
 ### Fixed
 
 - `LineBreak.ts`: Fixed demerit logic that was causing poor breakpoint selection
 
-## [0.2.9] - 2025-12-05
+## [0.2.9] - 2025-12-07
 
 ### Added
 

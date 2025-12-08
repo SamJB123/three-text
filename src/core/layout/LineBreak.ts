@@ -229,7 +229,7 @@ const INF_BAD = 10000;
 const DEFAULT_EMERGENCY_STRETCH_NO_HYPHEN = 0.1;
 
 // Another non TeX default: Short line detection thresholds
-const SHORT_LINE_WIDTH_THRESHOLD = 0.5; // Lines < 50% of width are problematic
+const SHORT_LINE_WIDTH_THRESHOLD = 0.7; // Lines < 70% of width are problematic
 const SHORT_LINE_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
 
 export class LineBreak {
