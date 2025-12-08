@@ -701,7 +701,9 @@ mesh.geometry.dispose();
 mesh.geometry = updated.geometry;
 ```
 
-The method preserves custom cache instances if `maxCacheSizeMB` was specified. For most use cases, this is primarily an API convenience.
+The method preserves custom cache instances if `maxCacheSizeMB` was specified. For most use cases, this is primarily an API convenience
+
+Options merge at the top level - to remove a nested property like `layout.width`, pass `{ layout: { width: undefined } }`
 
 ##### `Text.setHarfBuzzPath(path: string): void`
 
