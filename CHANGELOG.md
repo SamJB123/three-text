@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.10] - 2025-12-07
+
+### Fixed
+
+- `LineBreak.ts`: Fixed demerit logic that was causing poor breakpoint selection
+
 ## [0.2.9] - 2025-12-05
 
 ### Added
