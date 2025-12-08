@@ -1323,6 +1323,7 @@ export class LineBreak {
       // and only one active node left, force this break as a last resort
       const isLastResort =
         isFinalPass &&
+        isForcedBreak &&
         minimumDemerits.value === Infinity &&
         allActiveNodes.length === 1 &&
         node.active;
@@ -1396,6 +1397,7 @@ export class LineBreak {
       if (totalDemerits < minimumDemerits.value) {
         minimumDemerits.value = totalDemerits;
       }
+
       let existingNode = activeNodes.findExisting(breakpoint, fitnessClass);
 
       if (existingNode) {

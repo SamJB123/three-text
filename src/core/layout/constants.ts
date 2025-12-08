@@ -3,7 +3,7 @@
 export const FITNESS_TIGHT_THRESHOLD = 12; // if badness > 12 when shrinking -> tight_fit
 export const FITNESS_NORMAL_THRESHOLD = 99; // if badness > 99 when stretching -> loose_fit
 
-export const DEFAULT_TOLERANCE = 200;
+export const DEFAULT_TOLERANCE = 800;
 export const DEFAULT_PRETOLERANCE = 100;
 export const DEFAULT_EMERGENCY_STRETCH = 0;
 
