@@ -1076,12 +1076,12 @@ export class LineBreak {
   }
 
   private static findBreakpoints(
-    items: Item[],
-    lineWidth: number,
-    threshold: number = Infinity,
-    looseness: number = 0,
-    isFinalPass: boolean = false,
-    backgroundStretch: number = 0, // additional stretchability for all glue
+    items: Item[], // array of items (boxes, glues, penalties)
+    lineWidth: number, // desired line width
+    threshold: number = Infinity, // maximum badness allowed for a break
+    looseness: number = 0, // desired line count adjustment
+    isFinalPass: boolean = false, // whether this is the final pass
+    backgroundStretch: number = 0, // additional stretchability for all glue (emergency stretch)
     context?: LineBreakContext
   ): number[] {
     // Pre-compute cumulative widths for fast range queries
@@ -1516,7 +1516,7 @@ export class LineBreak {
     badness: number,
     stretching: boolean
   ): FitnessClass {
-    // Fitness classification based on badness
+    // TeX fitness classification based on badness (tex.web lines 16799-16803, 16810-16813)
     if (stretching) {
       // Stretching: decent_fit (0-12), loose_fit (13-99), very_loose_fit (100+)
       if (badness <= FITNESS_TIGHT_THRESHOLD) return FitnessClass.NORMAL;
