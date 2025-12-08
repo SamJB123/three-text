@@ -16,6 +16,7 @@
 
 - Fixed typo in vectors.ts comment
 - Removed unnecessary defensive check in update method
+- `LineBreak.ts`: improvements to emergency stretch, threshold handling, and minimum demerits tracking
 
 ## [0.2.8] - 2025-12-04
 

@@ -1,4 +1,4 @@
-// Type definitions for libtess 1.2.2
+// Type definitions for libtess 1.2
 // Project: https://github.com/brendankenny/libtess.js
 // Definitions by: Jeremy Tribby <https://tribby.com/>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
