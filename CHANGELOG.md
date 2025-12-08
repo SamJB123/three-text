@@ -1,6 +1,24 @@
 # Changelog
 
-## [0.2.9] - 2025-12-04
+## [0.2.9] - 2025-12-05
+
+### Added
+
+- `Text.create()` now returns an object with an `.update()` method for regenerating text geometry with different options
+
+### Changed
+
+- Example demos now use `.update()`
+- Improved demo rendering
+- Word cache now uses LRU eviction to prevent unbounded memory growth with dynamic text
+
+### Fixed
+
+- Fixed typo in vectors.ts comment
+- Removed unnecessary defensive check in update method
+- `LineBreak.ts`: improvements to emergency stretch, threshold handling, and minimum demerits tracking
+
+## [0.2.8] - 2025-12-04
 
 ### Added
 

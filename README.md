@@ -675,10 +675,33 @@ Creates text geometry with automatic font loading and HarfBuzz initialization
 - `getCacheStatistics()` - Cache performance data
 - `clearCache()` - Clear the glyph cache
 - `measureTextWidth(text, letterSpacing?)` - Measure text width
+- `update(options)` - Re-render with new options while preserving font/cache state
 
 **Three.js adapter (`three-text/three`) returns:**
 - `geometry: BufferGeometry` - Three.js geometry
 - Plus all the above except vertices/normals/indices/colors/glyphAttributes
+
+##### `update(options: Partial<TextOptions>): Promise<TextGeometryInfo>`
+
+Returns new geometry with updated options. Font and glyph data are cached globally by default, so performance is similar to calling `Text.create()` again; the method is provided for ergonomics when working with the same font configuration across multiple renders
+
+```javascript
+const text = await Text.create({
+  font: '/fonts/Font.ttf',
+  text: 'Hello',
+  size: 72
+});
+
+const mesh = new THREE.Mesh(text.geometry, material);
+scene.add(mesh);
+
+// Later, update the text
+const updated = await text.update({ text: 'World' });
+mesh.geometry.dispose();
+mesh.geometry = updated.geometry;
+```
+
+The method preserves custom cache instances if `maxCacheSizeMB` was specified. For most use cases, this is primarily an API convenience.
 
 ##### `Text.setHarfBuzzPath(path: string): void`
 

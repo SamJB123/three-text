@@ -89,7 +89,17 @@ export class Text {
         | 'getCacheStatistics'
         | 'clearCache'
         | 'measureTextWidth'
-      >
+      > & {
+        update: (
+          options: Partial<TextOptions>
+        ) => Promise<
+          TextGeometryInfo &
+            Pick<
+              Text,
+              'getLoadedFont' | 'getCacheStatistics' | 'clearCache' | 'measureTextWidth'
+            > & { update: (options: Partial<TextOptions>) => Promise<any> }
+        >;
+      }
   > {
     if (!options.font) {
       throw new Error(
@@ -102,6 +112,70 @@ export class Text {
       Text.hbInitPromise = HarfBuzzLoader.getHarfBuzz();
     }
 
+    const loadedFont = await Text.resolveFont(options);
+
+    const text = new Text({ maxCacheSizeMB: options.maxCacheSizeMB });
+    text.setLoadedFont(loadedFont);
+
+    // Initial creation
+    const { font, maxCacheSizeMB, ...geometryOptions } = options;
+    const result = await text.createGeometry(geometryOptions);
+
+    // Recursive update function
+    const update = async (
+      newOptions: Partial<TextOptions>
+    ): Promise<any> => {
+      // Merge options - preserve font from original options if not provided
+      const mergedOptions: TextOptions = { ...options };
+      for (const key in newOptions) {
+        const value = newOptions[key as keyof TextOptions];
+        if (value !== undefined) {
+          (mergedOptions as any)[key] = value;
+        }
+      }
+      
+      // If font definition or configuration changed, reload font and reset helpers
+      if (
+        newOptions.font !== undefined ||
+        newOptions.fontVariations !== undefined ||
+        newOptions.fontFeatures !== undefined
+      ) {
+        const newLoadedFont = await Text.resolveFont(mergedOptions);
+        text.setLoadedFont(newLoadedFont);
+        
+        // Reset geometry builder and shaper to use new font
+        text.resetHelpers();
+      }
+
+      // Update closure options for next time
+      options = mergedOptions;
+
+      const { font, maxCacheSizeMB, ...currentGeometryOptions } = options;
+      const newResult = await text.createGeometry(currentGeometryOptions);
+
+      return {
+        ...newResult,
+        getLoadedFont: () => text.getLoadedFont(),
+        getCacheStatistics: () => text.getCacheStatistics(),
+        clearCache: () => text.clearCache(),
+        measureTextWidth: (textString: string, letterSpacing?: number) =>
+          text.measureTextWidth(textString, letterSpacing),
+        update
+      };
+    };
+
+    return {
+      ...result,
+      getLoadedFont: () => text.getLoadedFont(),
+      getCacheStatistics: () => text.getCacheStatistics(),
+      clearCache: () => text.clearCache(),
+      measureTextWidth: (textString: string, letterSpacing?: number) =>
+        text.measureTextWidth(textString, letterSpacing),
+      update
+    };
+  }
+
+  private static async resolveFont(options: TextOptions): Promise<LoadedFont> {
     const baseFontKey =
       typeof options.font === 'string'
         ? options.font
@@ -119,26 +193,12 @@ export class Text {
     if (!loadedFont) {
       loadedFont = await Text.loadAndCacheFont(
         fontKey,
-        options.font,
+        options.font!,
         options.fontVariations,
         options.fontFeatures
       );
     }
-
-    const text = new Text({ maxCacheSizeMB: options.maxCacheSizeMB });
-    text.setLoadedFont(loadedFont);
-
-    const { font, maxCacheSizeMB, ...geometryOptions } = options;
-    const result = await text.createGeometry(geometryOptions);
-
-    return {
-      ...result,
-      getLoadedFont: () => text.getLoadedFont(),
-      getCacheStatistics: () => text.getCacheStatistics(),
-      clearCache: () => text.clearCache(),
-      measureTextWidth: (textString: string, letterSpacing?: number) =>
-        text.measureTextWidth(textString, letterSpacing)
-    };
+    return loadedFont;
   }
 
   private static async loadAndCacheFont(
@@ -799,6 +859,12 @@ export class Text {
       glyphIndex: glyphIndices,
       glyphLineIndex: glyphLineIndices
     };
+  }
+
+  private resetHelpers(): void {
+    this.geometryBuilder = undefined;
+    this.textShaper = undefined;
+    this.textLayout = undefined;
   }
 
   public destroy(): void {

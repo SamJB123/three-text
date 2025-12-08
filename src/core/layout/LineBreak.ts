@@ -78,11 +78,11 @@ interface BreakNode {
 }
 
 // ActiveNodeList maintains all currently viable breakpoints as we scan through the text.
-// Each node represents a potential break with accumulated demerits (total "cost" from start).
+// Each node represents a potential break with accumulated demerits (total "cost" from start)
 //
 // Demerits = cumulative penalty score from text start to this break, calculated as:
-//   (line_penalty + badness)² + penalty² + flagged/fitness adjustments (tex.web §859)
-// Lower demerits = better line breaks. TeX minimizes total demerits across the paragraph.
+//   (line_penalty + badness)² + penalty² + flagged/fitness adjustments (tex.web line 16634)
+// Lower demerits = better line breaks. TeX minimizes total demerits across the paragraph
 //
 // Implementation differs from TeX:
 // - Hash map for O(1) lookups by position+fitness
@@ -233,7 +233,7 @@ const SHORT_LINE_WIDTH_THRESHOLD = 0.5; // Lines < 50% of width are problematic
 const SHORT_LINE_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
 
 export class LineBreak {
-  // Calculate badness according to TeX's formula (tex.web §108, line 2337)
+  // Calculate badness according to TeX's formula (tex.web line 2337)
   // Given t (desired adjustment) and s (available stretch/shrink)
   // Returns approximation to 100(t/s)³, representing how "bad" a line is
   // Constants are derived from TeX's fixed-point arithmetic:
@@ -968,7 +968,7 @@ export class LineBreak {
         context
       );
 
-      // Second pass: compute hyphenation only if needed
+      // Second pass: with hyphenation if first pass failed
       if (breaks.length === 0 && useHyphenation) {
         const itemsWithHyphenation = LineBreak.itemizeText(
           text,
@@ -992,12 +992,15 @@ export class LineBreak {
         );
       }
 
-      // Emergency pass: use currentItems as-is (preserves hyphenation from pass 2 if it ran)
+      // Emergency pass: add emergency stretch to background stretchability
       if (breaks.length === 0) {
+        // For first emergency attempt, use initialEmergencyStretch
+        // For subsequent iterations (short line detection), progressively increase
+        currentEmergencyStretch = initialEmergencyStretch + (iteration * width * SHORT_LINE_EMERGENCY_STRETCH_INCREMENT);
         breaks = LineBreak.findBreakpoints(
           currentItems,
           width,
-          INF_BAD + 1,
+          tolerance,
           looseness,
           true,
           currentEmergencyStretch,
@@ -1005,12 +1008,12 @@ export class LineBreak {
         );
       }
 
-      // Force with infinite tolerance if still no breaks found
+      // Last resort: allow higher badness (but not infinite)
       if (breaks.length === 0) {
         breaks = LineBreak.findBreakpoints(
           currentItems,
           width,
-          Infinity,
+          INF_BAD,
           looseness,
           true,
           currentEmergencyStretch,
@@ -1039,9 +1042,7 @@ export class LineBreak {
           breaks.length > 1 &&
           LineBreak.hasShortLines(currentItems, breaks, width, shortLineThreshold)
         ) {
-          // Increase emergency stretch and try again
-          currentEmergencyStretch +=
-            width * SHORT_LINE_EMERGENCY_STRETCH_INCREMENT;
+          // Retry with more emergency stretch to push words to next line
           iteration++;
           continue;
         }
@@ -1080,13 +1081,14 @@ export class LineBreak {
     threshold: number = Infinity, // maximum badness allowed for a break
     looseness: number = 0, // desired line count adjustment
     isFinalPass: boolean = false, // whether this is the final pass
-    emergencyStretch: number = 0, // emergency stretch added to background stretchability
+    backgroundStretch: number = 0, // additional stretchability for all glue (emergency stretch)
     context?: LineBreakContext
   ): number[] {
     // Pre-compute cumulative widths for fast range queries
     const cumulativeWidths = LineBreak.computeCumulativeWidths(items);
 
     const activeNodes = new ActiveNodeList();
+    const minimumDemerits = { value: Infinity };
 
     activeNodes.insert({
       position: 0,
@@ -1111,9 +1113,11 @@ export class LineBreak {
           i,
           lineWidth,
           threshold,
-          emergencyStretch,
+          backgroundStretch,
           cumulativeWidths,
-          context
+          context,
+          isFinalPass,
+          minimumDemerits
         );
       }
 
@@ -1127,9 +1131,11 @@ export class LineBreak {
           i,
           lineWidth,
           threshold,
-          emergencyStretch,
+          backgroundStretch,
           cumulativeWidths,
-          context
+          context,
+          isFinalPass,
+          minimumDemerits
         );
       }
 
@@ -1144,9 +1150,11 @@ export class LineBreak {
           i,
           lineWidth,
           threshold,
-          emergencyStretch,
+          backgroundStretch,
           cumulativeWidths,
-          context
+          context,
+          isFinalPass,
+          minimumDemerits
         );
       }
 
@@ -1238,14 +1246,16 @@ export class LineBreak {
     breakpoint: number,
     lineWidth: number,
     threshold: number = Infinity,
-    emergencyStretch: number = 0,
+    backgroundStretch: number = 0,
     cumulativeWidths?: {
       widths: number[];
       stretches: number[];
       shrinks: number[];
       minWidths: number[];
     },
-    context?: LineBreakContext
+    context?: LineBreakContext,
+    isFinalPass: boolean = false,
+    minimumDemerits: { value: number } = { value: Infinity }
   ): void {
     const penalty =
       items[breakpoint].type === ItemType.PENALTY
@@ -1284,11 +1294,11 @@ export class LineBreak {
         totalWidth
       } = adjustmentData;
 
-      // Calculate badness according to TeX formula
+      // Calculate badness
       let badness: number;
       if (adjustment > 0) {
-        // Add emergency stretch to the background stretchability
-        const effectiveStretch = stretch + emergencyStretch;
+        // backgroundStretch includes emergency stretch if in emergency pass
+        const effectiveStretch = stretch + backgroundStretch;
         if (effectiveStretch <= 0) {
           // Overfull box - badness is infinite + 1
           badness = INF_BAD + 1;
@@ -1309,9 +1319,16 @@ export class LineBreak {
         badness = 0;
       }
 
-      if (!isForcedBreak && r < -1) {
-        // Too tight, skip unless forced
-        continue;
+      // Artificial demerits: in final pass with no feasible solution yet
+      // and only one active node left, force this break as a last resort
+      const isLastResort =
+        isFinalPass &&
+        minimumDemerits.value === Infinity &&
+        allActiveNodes.length === 1 &&
+        node.active;
+
+      if (!isForcedBreak && !isLastResort && r < -1) {
+        continue; // too tight
       }
 
       const fitnessClass = LineBreak.computeFitnessClass(
@@ -1319,16 +1336,18 @@ export class LineBreak {
         adjustment > 0
       );
 
-      if (!isForcedBreak && badness > threshold) {
+      if (!isForcedBreak && !isLastResort && badness > threshold) {
         continue;
       }
 
-      // Initialize demerits based on TeX formula with saturation check
+      // Initialize demerits with saturation check
       let flaggedDemerits = 0;
       let fitnessDemerits = 0;
       const configuredLinePenalty = context?.linePenalty ?? 0;
       let d = configuredLinePenalty + badness;
       let demerits = Math.abs(d) >= 10000 ? 100000000 : d * d;
+
+      const artificialDemerits = isLastResort;
 
       const breakpointPenalty =
         items[breakpoint].type === ItemType.PENALTY
@@ -1337,7 +1356,7 @@ export class LineBreak {
             ? (items[breakpoint] as Discretionary).penalty
             : 0;
 
-      // TeX penalty handling: pi != 0 check, then positive/negative logic
+      // Penalty contribution to demerits
       if (breakpointPenalty !== 0) {
         if (breakpointPenalty > 0) {
           demerits += breakpointPenalty * breakpointPenalty;
@@ -1369,11 +1388,14 @@ export class LineBreak {
         demerits += fitnessDemerits;
       }
 
-      if (isForcedBreak) {
+      if (isForcedBreak || artificialDemerits) {
         demerits = 0;
       }
 
       const totalDemerits = node.totalDemerits + demerits;
+      if (totalDemerits < minimumDemerits.value) {
+        minimumDemerits.value = totalDemerits;
+      }
       let existingNode = activeNodes.findExisting(breakpoint, fitnessClass);
 
       if (existingNode) {
@@ -1550,7 +1572,6 @@ export class LineBreak {
   }
 
   // Deactivate nodes that can't lead to good line breaks
-  // TeX recalculates minWidth each time, we use cumulative arrays for lookup
   private static deactivateNodes(
     activeNodeList: ActiveNodeList,
     currentPosition: number,

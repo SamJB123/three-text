@@ -3,8 +3,8 @@ import { convertFontFeaturesToString } from './fontFeatures';
 
 export class TextMeasurer {
   // Measures text width including letter spacing
-  // Letter spacing is added uniformly after each glyph during measurement,
-  // so the widths given to the line-breaking algorithm already account for tracking
+  // (letter spacing is added uniformly after each glyph during measurement,
+  // so the widths given to the line-breaking algorithm already account for tracking)
   public static measureTextWidth(
     loadedFont: LoadedFont,
     text: string,

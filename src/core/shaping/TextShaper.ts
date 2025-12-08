@@ -120,7 +120,7 @@ export class TextShaper {
     let clusterStartPosition = new Vec3();
 
     let cursor = new Vec3(lineInfo.xOffset, -lineIndex * scaledLineHeight, 0);
-    // Apply letter spacing between glyphs (must match what was used in width measurements)
+    // Apply letter spacing after each glyph to match width measurements used during line breaking
     const letterSpacingFU = letterSpacing * this.loadedFont.upem;
 
     const spaceAdjustment = this.calculateSpaceAdjustment(

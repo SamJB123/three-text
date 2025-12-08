@@ -888,7 +888,12 @@
         controls,
         textMesh;
       let isRendering = false;
+      let currentTextInstance = null;
       let time = 0;
+      
+      const debouncedRender = () => {
+        renderText();
+      };
         let gui;
         let textFolder;
         let customFontBuffer = null;
@@ -1388,12 +1393,6 @@
         // Add font upload section
         addFontUploadGUI();
 
-        let renderTimeout;
-        const debouncedRender = () => {
-          clearTimeout(renderTimeout);
-          renderTimeout = setTimeout(renderText, 300);
-        };
-
         textFolder = gui.addFolder("Text");
         textFolder
           .add(params, "text")
@@ -1835,9 +1834,7 @@
           const controller = textFolder
             .add(params, `fontVar_${tag}`, axisInfo.min, axisInfo.max, tag === "slnt" ? 0.1 : 1)
             .name(name)
-            .onChange(() => {
-              renderText();
-            });
+            .onChange(debouncedRender);
             
           variableFontControllers.push(controller);
         }
@@ -1866,9 +1863,7 @@
           const controller = featuresFolder
             .add(params, `fontFeat_${tag}`)
             .name(tag)
-            .onChange(() => {
-              renderText();
-            });
+            .onChange(debouncedRender);
             
           featureControllers.push(controller);
         }
@@ -1885,9 +1880,7 @@
           const controller = featuresFolder
             .add(params, `fontFeat_${tag}`)
             .name(displayName)
-            .onChange(() => {
-              renderText();
-            });
+            .onChange(debouncedRender);
             
           featureControllers.push(controller);
         }
@@ -1904,9 +1897,7 @@
           const controller = featuresFolder
             .add(params, `fontFeat_${tag}`)
             .name(displayName)
-            .onChange(() => {
-              renderText();
-            });
+            .onChange(debouncedRender);
             
           featureControllers.push(controller);
         }
@@ -1918,6 +1909,9 @@
           
           customFontBuffer = await file.arrayBuffer();
           currentFontName = file.name;
+          
+          // Reset instance when font changes to force reload
+          currentTextInstance = null;
           
           if (window.fontDisplay && window.fontController) {
             window.fontDisplay.currentFont = currentFontName;
@@ -2104,49 +2098,99 @@
           const needsGlyphAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(params.shaderMode);
 
           const startTime = performance.now();
-          const result = await Text.create({
-            text: params.text,
-            font: font,
-            size: params.fontSize,
-            depth: params.depth,
-            lineHeight: params.lineHeight,
-            letterSpacing: params.letterSpacing,
-            fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
-            fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
-            removeOverlaps: params.removeOverlaps,
-            separateGlyphsWithAttributes: needsGlyphAttributes,
-            curveFidelity: {
-              distanceTolerance: params.distanceTolerance,
-              angleTolerance: params.angleTolerance,
-            },
-            geometryOptimization: {
-              enabled: params.optimizationEnabled,
-              areaThreshold: params.areaThreshold,
-              colinearThreshold: params.colinearThreshold,
-              minSegmentLength: params.minSegmentLength,
-            },
-            layout: {
-              width: params.lineWidth,
-              align: params.alignment,
-              direction: params.direction,
-              hyphenate: params.hyphenate,
-              language: params.language,
-              tolerance: params.tolerance,
-              pretolerance: params.pretolerance,
-              emergencyStretch: params.emergencyStretch,
-              respectExistingBreaks: params.respectExistingBreaks,
-              disableShortLineDetection: params.disableShortLineDetection,
-              shortLineThreshold: params.shortLineThreshold,
-              lefthyphenmin: params.lefthyphenmin,
-              righthyphenmin: params.righthyphenmin,
-              looseness: params.looseness,
-              linepenalty: params.linepenalty,
-              adjdemerits: params.adjdemerits,
-              hyphenpenalty: params.hyphenpenalty,
-              exhyphenpenalty: params.exhyphenpenalty,
-              doublehyphendemerits: params.doublehyphendemerits,
-            },
-          });
+          let result;
+          
+          if (currentTextInstance) {
+            // For updates, only pass what changed (don't re-pass font)
+            result = await currentTextInstance.update({
+              text: params.text,
+              size: params.fontSize,
+              depth: params.depth,
+              lineHeight: params.lineHeight,
+              letterSpacing: params.letterSpacing,
+              fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
+              fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
+              removeOverlaps: params.removeOverlaps,
+              separateGlyphsWithAttributes: needsGlyphAttributes,
+              curveFidelity: {
+                distanceTolerance: params.distanceTolerance,
+                angleTolerance: params.angleTolerance,
+              },
+              geometryOptimization: {
+                enabled: params.optimizationEnabled,
+                areaThreshold: params.areaThreshold,
+                colinearThreshold: params.colinearThreshold,
+                minSegmentLength: params.minSegmentLength,
+              },
+              layout: {
+                width: params.lineWidth,
+                align: params.alignment,
+                direction: params.direction,
+                hyphenate: params.hyphenate,
+                language: params.language,
+                tolerance: params.tolerance,
+                pretolerance: params.pretolerance,
+                emergencyStretch: params.emergencyStretch,
+                respectExistingBreaks: params.respectExistingBreaks,
+                disableShortLineDetection: params.disableShortLineDetection,
+                shortLineThreshold: params.shortLineThreshold,
+                lefthyphenmin: params.lefthyphenmin,
+                righthyphenmin: params.righthyphenmin,
+                looseness: params.looseness,
+                linepenalty: params.linepenalty,
+                adjdemerits: params.adjdemerits,
+                hyphenpenalty: params.hyphenpenalty,
+                exhyphenpenalty: params.exhyphenpenalty,
+                doublehyphendemerits: params.doublehyphendemerits,
+              },
+            });
+          } else {
+            // For initial creation, include font
+            result = await Text.create({
+              text: params.text,
+              font: font,
+              size: params.fontSize,
+              depth: params.depth,
+              lineHeight: params.lineHeight,
+              letterSpacing: params.letterSpacing,
+              fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
+              fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
+              removeOverlaps: params.removeOverlaps,
+              separateGlyphsWithAttributes: needsGlyphAttributes,
+              curveFidelity: {
+                distanceTolerance: params.distanceTolerance,
+                angleTolerance: params.angleTolerance,
+              },
+              geometryOptimization: {
+                enabled: params.optimizationEnabled,
+                areaThreshold: params.areaThreshold,
+                colinearThreshold: params.colinearThreshold,
+                minSegmentLength: params.minSegmentLength,
+              },
+              layout: {
+                width: params.lineWidth,
+                align: params.alignment,
+                direction: params.direction,
+                hyphenate: params.hyphenate,
+                language: params.language,
+                tolerance: params.tolerance,
+                pretolerance: params.pretolerance,
+                emergencyStretch: params.emergencyStretch,
+                respectExistingBreaks: params.respectExistingBreaks,
+                disableShortLineDetection: params.disableShortLineDetection,
+                shortLineThreshold: params.shortLineThreshold,
+                lefthyphenmin: params.lefthyphenmin,
+                righthyphenmin: params.righthyphenmin,
+                looseness: params.looseness,
+                linepenalty: params.linepenalty,
+                adjdemerits: params.adjdemerits,
+                hyphenpenalty: params.hyphenpenalty,
+                exhyphenpenalty: params.exhyphenpenalty,
+                doublehyphendemerits: params.doublehyphendemerits,
+              },
+            });
+          }
+          currentTextInstance = result;
 
           const loadedFont = result.getLoadedFont();
           
@@ -2170,49 +2214,56 @@
             }
           }
 
-          if (textMesh) {
-            scene.remove(textMesh);
-            if (textMesh.geometry) textMesh.geometry.dispose();
-            if (textMesh.material) textMesh.material.dispose();
-          }
-
           result.geometry.computeBoundingBox();
           const center = new THREE.Vector3();
           result.geometry.boundingBox.getCenter(center);
           result.geometry.translate(-center.x, -center.y, -center.z);
 
+          // Update glyphCenter attributes and calculate diagonal range in single pass
+          let minDiagonal = 0;
+          let maxDiagonal = 1;
+          
           if (needsGlyphAttributes && result.geometry.attributes.glyphCenter) {
             const glyphCenterAttr = result.geometry.attributes.glyphCenter;
+            minDiagonal = Infinity;
+            maxDiagonal = -Infinity;
+            
             for (let i = 0; i < glyphCenterAttr.count; i++) {
-              glyphCenterAttr.setX(i, glyphCenterAttr.getX(i) - center.x);
-              glyphCenterAttr.setY(i, glyphCenterAttr.getY(i) - center.y);
-              glyphCenterAttr.setZ(i, glyphCenterAttr.getZ(i) - center.z);
-            }
-            glyphCenterAttr.needsUpdate = true;
-          }
-
-          let minDiagonal = Infinity;
-          let maxDiagonal = -Infinity;
-
-          if (needsGlyphAttributes && result.geometry.attributes.glyphCenter) {
-            const glyphCenterAttr = result.geometry.attributes.glyphCenter;
-            for (let i = 0; i < glyphCenterAttr.count; i++) {
-              const x = glyphCenterAttr.getX(i);
-              const y = glyphCenterAttr.getY(i);
-              const diagonal = x + y;
+              // Update position
+              const newX = glyphCenterAttr.getX(i) - center.x;
+              const newY = glyphCenterAttr.getY(i) - center.y;
+              const newZ = glyphCenterAttr.getZ(i) - center.z;
+              
+              glyphCenterAttr.setX(i, newX);
+              glyphCenterAttr.setY(i, newY);
+              glyphCenterAttr.setZ(i, newZ);
+              
+              // Calculate diagonal
+              const diagonal = newX + newY;
               minDiagonal = Math.min(minDiagonal, diagonal);
               maxDiagonal = Math.max(maxDiagonal, diagonal);
             }
+            glyphCenterAttr.needsUpdate = true;
           }
 
           const paragraphCenter = new THREE.Vector3(0, 0, 0);
           const material = createMaterialForMode(params.shaderMode, paragraphCenter, minDiagonal, maxDiagonal);
 
-          textMesh = new THREE.Mesh(result.geometry, material);
-          textMesh.rotation.x = 0;
-          textMesh.rotation.y = 0.5;
-
-          scene.add(textMesh);
+          if (textMesh) {
+            const oldGeometry = textMesh.geometry;
+            const oldMaterial = textMesh.material;
+            
+            textMesh.geometry = result.geometry;
+            textMesh.material = material;
+            
+            if (oldGeometry) oldGeometry.dispose();
+            if (oldMaterial) oldMaterial.dispose();
+          } else {
+            textMesh = new THREE.Mesh(result.geometry, material);
+            textMesh.rotation.x = 0;
+            textMesh.rotation.y = 0.5;
+            scene.add(textMesh);
+          }
           const renderTime = Math.round(performance.now() - startTime);
           updateStatus(`${result.stats.trianglesGenerated.toLocaleString()} triangles in ${renderTime}ms`, "ready");
         } catch (error) {

@@ -48,6 +48,8 @@
 
       let scene, camera, renderer, controls, textMesh;
       let gui;
+      let currentTextInstance = null;
+      let fontBuffer = "./fonts/Merriweather-VariableFont_opsz,wdth,wght.woff";
 
       const params = {
          text: "Variable Typography",
@@ -55,6 +57,10 @@
          depth: 20,
          fontVariations: {},
        };
+       
+      const debouncedRender = () => {
+        renderText();
+      };
 
       async function init() {
         scene = new THREE.Scene();
@@ -75,8 +81,6 @@
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         
-        let fontBuffer = "./fonts/Merriweather-VariableFont_opsz,wdth,wght.woff";
-        
         initGUI();
         await renderText();
         animate();
@@ -84,27 +88,25 @@
 
       function initGUI() {
         gui = new GUI();
-        gui.add(params, "text").name("Text").onChange(renderText);
+        gui.add(params, "text").name("Text").onChange(debouncedRender);
       }
 
       async function renderText() {
-        if (textMesh) {
-          scene.remove(textMesh);
-          textMesh.geometry.dispose();
-          textMesh.material.dispose();
-        }
-
         const textOptions = {
           text: params.text,
           size: params.fontSize,
           depth: params.depth,
           fontVariations: params.fontVariations,
+          font: fontBuffer
         };
 
-        const result = await Text.create({
-          ...textOptions,
-          font: fontBuffer
-        });
+        let result;
+        if (currentTextInstance) {
+          result = await currentTextInstance.update(textOptions);
+        } else {
+          result = await Text.create(textOptions);
+        }
+        currentTextInstance = result;
         
         const loadedFont = result.getLoadedFont();
         if (loadedFont?.variationAxes && Object.keys(params.fontVariations).length === 0) {
@@ -119,19 +121,30 @@
             params.fontVariations[tag] = axisInfo.default;
             gui.add(params.fontVariations, tag, axisInfo.min, axisInfo.max, tag === "slnt" ? 0.1 : 1)
                .name(name)
-               .onChange(renderText);
+               .onChange(debouncedRender);
           }
         }
-        
-        const material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
-        textMesh = new THREE.Mesh(result.geometry, material);
         
         result.geometry.computeBoundingBox();
         const center = new THREE.Vector3();
         result.geometry.boundingBox.getCenter(center);
         result.geometry.translate(-center.x, -center.y, -center.z);
+        
+        const material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
 
-        scene.add(textMesh);
+        if (textMesh) {
+          const oldGeometry = textMesh.geometry;
+          const oldMaterial = textMesh.material;
+          
+          textMesh.geometry = result.geometry;
+          textMesh.material = material;
+          
+          if (oldGeometry) oldGeometry.dispose();
+          if (oldMaterial) oldMaterial.dispose();
+        } else {
+          textMesh = new THREE.Mesh(result.geometry, material);
+          scene.add(textMesh);
+        }
       }
 
       function animate() {
