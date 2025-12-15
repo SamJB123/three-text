@@ -1,10 +1,20 @@
 # Changelog
 
+## [0.2.12] - 2025-12-14
+
+### Fixed
+
+- Fixed selective text coloring (`byText`, `byCharRange`) incorrectly coloring adjacent punctuation when letters overlap. Colored clusters now use glyph-level caching to ensure each glyph has independent vertex ranges, while non-colored clusters continue using fast cluster-level caching
+
+### Changed
+
+- Migrated to `@types/libtess` package from DefinitelyTyped after contributing type definitions upstream
+
 ## [0.2.11] - 2025-12-08
 
 ### Fixed
 
-- `LineBreak.ts`: Default short line detection threshold increased from 50% to 70% for better balance
+- `LineBreak.ts`: Default short line detection threshold increased from 50% to 70%
 
 ## [0.2.10] - 2025-12-08
 

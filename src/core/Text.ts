@@ -358,12 +358,42 @@ export class Text {
         options.text
       );
 
+      // Pre-compute which character indices will be colored. This allows geometry building
+      // to selectively use glyph-level caching (separate vertices) only for clusters containing
+      // colored text, while non-colored clusters can still use fast cluster-level merging
+      let coloredTextIndices: Set<number> | undefined;
+      if (options.color && typeof options.color === 'object' && !Array.isArray(options.color)) {
+        if (options.color.byText || options.color.byCharRange) {
+          // Build the set manually since glyphs don't exist yet
+          coloredTextIndices = new Set<number>();
+          if (options.color.byText) {
+            for (const pattern of Object.keys(options.color.byText)) {
+              let index = 0;
+              while ((index = options.text.indexOf(pattern, index)) !== -1) {
+                for (let i = index; i < index + pattern.length; i++) {
+                  coloredTextIndices.add(i);
+                }
+                index += pattern.length;
+              }
+            }
+          }
+          if (options.color.byCharRange) {
+            for (const range of options.color.byCharRange) {
+              for (let i = range.start; i < range.end; i++) {
+                coloredTextIndices.add(i);
+              }
+            }
+          }
+        }
+      }
+
       const shapedResult = this.geometryBuilder.buildInstancedGeometry(
         clustersByLine,
         layoutData.depth,
         shouldRemoveOverlaps,
         this.loadedFont.metrics.isCFF,
-        options.separateGlyphsWithAttributes || false
+        options.separateGlyphsWithAttributes || false,
+        coloredTextIndices
       );
 
       const cacheStats = this.geometryBuilder.getCacheStats();

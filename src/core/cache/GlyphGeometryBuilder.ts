@@ -95,7 +95,8 @@ export class GlyphGeometryBuilder {
     depth: number,
     removeOverlaps: boolean,
     isCFF: boolean,
-    separateGlyphs: boolean = false
+    separateGlyphs: boolean = false,
+    coloredTextIndices?: Set<number>
   ): InstancedTextGeometry {
     perfLogger.start('GlyphGeometryBuilder.buildInstancedGeometry', {
       lineCount: clustersByLine.length,
@@ -131,7 +132,16 @@ export class GlyphGeometryBuilder {
           clusterGlyphContours,
           relativePositions
         );
-        const hasOverlaps = separateGlyphs
+        
+        const clusterHasColoredGlyphs = coloredTextIndices && 
+          cluster.glyphs.some((g) => coloredTextIndices.has(g.absoluteTextIndex));
+        
+        // Force glyph-level caching if:
+        // - separateGlyphs flag is set (for shader attributes), OR
+        // - cluster contains selectively colored text (needs separate vertex ranges per glyph)
+        const forceSeparate = separateGlyphs || clusterHasColoredGlyphs;
+        
+        const hasOverlaps = forceSeparate
           ? false
           : boundaryGroups.some((group) => group.length > 1);
 

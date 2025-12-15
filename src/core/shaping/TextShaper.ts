@@ -53,25 +53,6 @@ export class TextShaper {
       lineCount: lineInfos.length
     });
 
-    // Calculate color boundaries once for the entire text before line processing
-    const colorBoundaries = new Set<number>();
-    if (
-      color &&
-      typeof color === 'object' &&
-      'byText' in color &&
-      color.byText &&
-      originalText
-    ) {
-      for (const textToColor of Object.keys(color.byText)) {
-        let index = 0;
-        while ((index = originalText.indexOf(textToColor, index)) !== -1) {
-          colorBoundaries.add(index);
-          colorBoundaries.add(index + textToColor.length);
-          index += textToColor.length;
-        }
-      }
-    }
-
     const clustersByLine: GlyphCluster[][] = [];
 
     lineInfos.forEach((lineInfo, lineIndex) => {
@@ -81,8 +62,7 @@ export class TextShaper {
         scaledLineHeight,
         letterSpacing,
         align,
-        direction,
-        colorBoundaries
+        direction
       );
       clustersByLine.push(clusters);
     });
@@ -95,8 +75,7 @@ export class TextShaper {
     scaledLineHeight: number,
     letterSpacing: number,
     align: string,
-    direction: TextDirection,
-    colorBoundaries: Set<number>
+    direction: TextDirection
   ): GlyphCluster[] {
     const buffer = this.loadedFont.hb.createBuffer();
     if (direction === 'rtl') {
@@ -148,9 +127,9 @@ export class TextShaper {
 
       glyph.lineIndex = lineIndex;
 
-      const isBoundary = colorBoundaries.has(glyph.absoluteTextIndex);
-
-      if (isWhitespace || isBoundary) {
+      // Cluster boundaries are based on whitespace only.
+      // Coloring is applied later via vertex colors and must never affect shaping/kerning.
+      if (isWhitespace) {
         if (currentClusterGlyphs.length > 0) {
           clusters.push({
             text: currentClusterText,
