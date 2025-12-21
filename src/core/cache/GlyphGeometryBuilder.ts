@@ -42,6 +42,7 @@ export class GlyphGeometryBuilder {
   private loadedFont: LoadedFont;
   private wordCache: LRUCache<string, GlyphData>;
   private contourCache: LRUCache<number, GlyphContours>;
+  private clusteringCache: LRUCache<string, { glyphIds: number[], groups: number[][] }>;
 
   constructor(cache: GlyphCache, loadedFont: LoadedFont) {
     this.cache = cache;
@@ -70,6 +71,10 @@ export class GlyphGeometryBuilder {
         size += data.indices.length * data.indices.BYTES_PER_ELEMENT;
         return size;
       }
+    });
+    this.clusteringCache = new LRUCache<string, { glyphIds: number[], groups: number[][] }>({
+      maxEntries: 2000,
+      calculateSize: () => 1
     });
   }
 
@@ -125,153 +130,217 @@ export class GlyphGeometryBuilder {
         }
 
         // Step 2: Check for overlaps within the cluster
-        const relativePositions = cluster.glyphs.map(
-          (g) => new Vec3(g.x, g.y, 0)
-        );
-        const boundaryGroups = this.clusterer.cluster(
-          clusterGlyphContours,
-          relativePositions
-        );
-        
-        const clusterHasColoredGlyphs = coloredTextIndices && 
-          cluster.glyphs.some((g) => coloredTextIndices.has(g.absoluteTextIndex));
-        
+        let boundaryGroups: number[][];
+        if (cluster.glyphs.length <= 1) {
+          boundaryGroups = [[0]];
+        } else {
+          // Check clustering cache (same text + glyph IDs = same overlap groups)
+          const cacheKey = cluster.text;
+          const cached = this.clusteringCache.get(cacheKey);
+          
+          let isValid = false;
+          if (cached && cached.glyphIds.length === cluster.glyphs.length) {
+            isValid = true;
+            for (let i = 0; i < cluster.glyphs.length; i++) {
+              if (cached.glyphIds[i] !== cluster.glyphs[i].g) {
+                isValid = false;
+                break;
+              }
+            }
+          }
+
+          if (isValid && cached) {
+            boundaryGroups = cached.groups;
+          } else {
+            const relativePositions = cluster.glyphs.map(
+              (g) => new Vec3(g.x, g.y, 0)
+            );
+            boundaryGroups = this.clusterer.cluster(
+              clusterGlyphContours,
+              relativePositions
+            );
+            
+            this.clusteringCache.set(cacheKey, {
+              glyphIds: cluster.glyphs.map(g => g.g),
+              groups: boundaryGroups
+            });
+          }
+        }
+
+        const clusterHasColoredGlyphs =
+          coloredTextIndices &&
+          cluster.glyphs.some((g) =>
+            coloredTextIndices.has(g.absoluteTextIndex)
+          );
+
         // Force glyph-level caching if:
         // - separateGlyphs flag is set (for shader attributes), OR
         // - cluster contains selectively colored text (needs separate vertex ranges per glyph)
         const forceSeparate = separateGlyphs || clusterHasColoredGlyphs;
-        
-        const hasOverlaps = forceSeparate
-          ? false
-          : boundaryGroups.some((group) => group.length > 1);
 
-        if (hasOverlaps) {
-          // Cluster-level caching
-          const clusterKey = `${this.fontId}_${cluster.text}_${depth}_${removeOverlaps}`;
-          let cachedCluster = this.wordCache.get(clusterKey);
+        // Iterate over the geometric groups identified by BoundaryClusterer
+        // logical groups (words) are now split into geometric sub-groups (e.g. "aa", "XX", "bb")
+        for (const groupIndices of boundaryGroups) {
+          const isOverlappingGroup = groupIndices.length > 1;
+          const shouldCluster = isOverlappingGroup && !forceSeparate;
 
-          if (!cachedCluster) {
-            const clusterPaths: Path[] = [];
-            for (let i = 0; i < clusterGlyphContours.length; i++) {
-              const glyphContours = clusterGlyphContours[i];
-              const glyph = cluster.glyphs[i];
-              for (const path of glyphContours.paths) {
-                clusterPaths.push({
-                  ...path,
-                  points: path.points.map(
-                    (p) => new Vec2(p.x + (glyph.x ?? 0), p.y + (glyph.y ?? 0))
-                  )
-                });
-              }
-            }
-            cachedCluster = this.tessellateGlyphCluster(
-              clusterPaths,
-              depth,
-              isCFF
-            );
-            this.wordCache.set(clusterKey, cachedCluster);
-          }
-
-          const vertexOffset = vertices.length / 3;
-          this.appendGeometry(
-            vertices,
-            normals,
-            indices,
-            cachedCluster,
-            cluster.position,
-            vertexOffset
-          );
-
-          const clusterVertexCount = cachedCluster.vertices.length / 3;
-          for (let i = 0; i < cluster.glyphs.length; i++) {
-            const glyph = cluster.glyphs[i];
-            const glyphContours = clusterGlyphContours[i];
-
-            const absoluteGlyphPosition = new Vec3(
-              cluster.position.x + (glyph.x ?? 0),
-              cluster.position.y + (glyph.y ?? 0),
-              cluster.position.z
-            );
-
-            const glyphInfo = this.createGlyphInfo(
-              glyph,
-              vertexOffset,
-              clusterVertexCount,
-              absoluteGlyphPosition,
-              glyphContours,
-              depth
-            );
-            glyphInfos.push(glyphInfo);
-            this.updatePlaneBounds(glyphInfo.bounds, planeBounds);
-          }
-        } else {
-          // Glyph-level caching
-          for (let i = 0; i < cluster.glyphs.length; i++) {
-            const glyph = cluster.glyphs[i];
-            const glyphContours = clusterGlyphContours[i];
-            const glyphPosition = new Vec3(
-              cluster.position.x + (glyph.x ?? 0),
-              cluster.position.y + (glyph.y ?? 0),
-              cluster.position.z
-            );
-
-            // Skip glyphs with no paths (spaces, zero-width characters, etc.)
-            if (glyphContours.paths.length === 0) {
-              const glyphInfo = this.createGlyphInfo(
-                glyph,
-                0,
-                0,
-                glyphPosition,
-                glyphContours,
-                depth
-              );
-              glyphInfos.push(glyphInfo);
-              continue;
-            }
-
-            let cachedGlyph = this.cache.get(
-              this.fontId,
-              glyph.g,
+          if (shouldCluster) {
+            // Cluster-level caching for this specific group of overlapping glyphs
+            const subClusterGlyphs = groupIndices.map((i) => cluster.glyphs[i]);
+            const clusterKey = this.getClusterKey(
+              subClusterGlyphs,
               depth,
               removeOverlaps
             );
 
-            if (!cachedGlyph) {
-              cachedGlyph = this.tessellateGlyph(
-                glyphContours,
+            let cachedCluster = this.wordCache.get(clusterKey);
+
+            if (!cachedCluster) {
+              const clusterPaths: Path[] = [];
+              const refX = subClusterGlyphs[0].x ?? 0;
+              const refY = subClusterGlyphs[0].y ?? 0;
+
+              for (let i = 0; i < groupIndices.length; i++) {
+                const originalIndex = groupIndices[i];
+                const glyphContours = clusterGlyphContours[originalIndex];
+                const glyph = cluster.glyphs[originalIndex];
+
+                // Position relative to the sub-cluster start
+                const relX = (glyph.x ?? 0) - refX;
+                const relY = (glyph.y ?? 0) - refY;
+
+                for (const path of glyphContours.paths) {
+                  clusterPaths.push({
+                    ...path,
+                    points: path.points.map(
+                      (p) => new Vec2(p.x + relX, p.y + relY)
+                    )
+                  });
+                }
+              }
+              cachedCluster = this.tessellateGlyphCluster(
+                clusterPaths,
                 depth,
-                removeOverlaps,
                 isCFF
               );
-              this.cache.set(
-                this.fontId,
-                glyph.g,
-                depth,
-                removeOverlaps,
-                cachedGlyph
-              );
+              this.wordCache.set(clusterKey, cachedCluster);
             }
+
+            // Calculate the absolute position of this sub-cluster based on its first glyph
+
+            // (since the cached geometry is relative to that first glyph)
+            const firstGlyphInGroup = subClusterGlyphs[0];
+            const groupPosition = new Vec3(
+              cluster.position.x + (firstGlyphInGroup.x ?? 0),
+              cluster.position.y + (firstGlyphInGroup.y ?? 0),
+              cluster.position.z
+            );
 
             const vertexOffset = vertices.length / 3;
             this.appendGeometry(
               vertices,
               normals,
               indices,
-              cachedGlyph,
-              glyphPosition,
+              cachedCluster,
+              groupPosition,
               vertexOffset
             );
 
-            const glyphInfo = this.createGlyphInfo(
-              glyph,
-              vertexOffset,
-              cachedGlyph.vertices.length / 3,
-              glyphPosition,
-              glyphContours,
-              depth
-            );
-            glyphInfos.push(glyphInfo);
-            this.updatePlaneBounds(glyphInfo.bounds, planeBounds);
+            const clusterVertexCount = cachedCluster.vertices.length / 3;
+
+            // Register glyph infos for all glyphs in this sub-cluster
+            // They all point to the same merged geometry
+            for (let i = 0; i < groupIndices.length; i++) {
+              const originalIndex = groupIndices[i];
+              const glyph = cluster.glyphs[originalIndex];
+              const glyphContours = clusterGlyphContours[originalIndex];
+
+              const absoluteGlyphPosition = new Vec3(
+                cluster.position.x + (glyph.x ?? 0),
+                cluster.position.y + (glyph.y ?? 0),
+                cluster.position.z
+              );
+
+              const glyphInfo = this.createGlyphInfo(
+                glyph,
+                vertexOffset,
+                clusterVertexCount,
+                absoluteGlyphPosition,
+                glyphContours,
+                depth
+              );
+              glyphInfos.push(glyphInfo);
+              this.updatePlaneBounds(glyphInfo.bounds, planeBounds);
+            }
+          } else {
+            // Glyph-level caching (standard path for isolated glyphs or when forced separate)
+            for (const i of groupIndices) {
+              const glyph = cluster.glyphs[i];
+              const glyphContours = clusterGlyphContours[i];
+              const glyphPosition = new Vec3(
+                cluster.position.x + (glyph.x ?? 0),
+                cluster.position.y + (glyph.y ?? 0),
+                cluster.position.z
+              );
+
+              // Skip glyphs with no paths (spaces, zero-width characters, etc.)
+              if (glyphContours.paths.length === 0) {
+                const glyphInfo = this.createGlyphInfo(
+                  glyph,
+                  0,
+                  0,
+                  glyphPosition,
+                  glyphContours,
+                  depth
+                );
+                glyphInfos.push(glyphInfo);
+                continue;
+              }
+
+              let cachedGlyph = this.cache.get(
+                this.fontId,
+                glyph.g,
+                depth,
+                removeOverlaps
+              );
+
+              if (!cachedGlyph) {
+                cachedGlyph = this.tessellateGlyph(
+                  glyphContours,
+                  depth,
+                  removeOverlaps,
+                  isCFF
+                );
+                this.cache.set(
+                  this.fontId,
+                  glyph.g,
+                  depth,
+                  removeOverlaps,
+                  cachedGlyph
+                );
+              }
+
+              const vertexOffset = vertices.length / 3;
+              this.appendGeometry(
+                vertices,
+                normals,
+                indices,
+                cachedGlyph,
+                glyphPosition,
+                vertexOffset
+              );
+
+              const glyphInfo = this.createGlyphInfo(
+                glyph,
+                vertexOffset,
+                cachedGlyph.vertices.length / 3,
+                glyphPosition,
+                glyphContours,
+                depth
+              );
+              glyphInfos.push(glyphInfo);
+              this.updatePlaneBounds(glyphInfo.bounds, planeBounds);
+            }
           }
         }
       }
@@ -290,6 +359,28 @@ export class GlyphGeometryBuilder {
       glyphInfos,
       planeBounds
     };
+  }
+
+  private getClusterKey(
+    glyphs: HarfBuzzGlyph[],
+    depth: number,
+    removeOverlaps: boolean
+  ): string {
+    if (glyphs.length === 0) return '';
+
+    // Normalize positions relative to the first glyph in the cluster
+    const refX = glyphs[0].x ?? 0;
+    const refY = glyphs[0].y ?? 0;
+
+    const parts = glyphs.map((g) => {
+      const relX = (g.x ?? 0) - refX;
+      const relY = (g.y ?? 0) - refY;
+      return `${g.g}:${relX},${relY}`;
+    });
+
+    const ids = parts.join('|');
+    const roundedDepth = Math.round(depth * 1000) / 1000;
+    return `${this.fontId}_${ids}_${roundedDepth}_${removeOverlaps}`;
   }
 
   private appendGeometry(
@@ -489,5 +580,6 @@ export class GlyphGeometryBuilder {
   public clearCache() {
     this.cache.clear();
     this.wordCache.clear();
+    this.clusteringCache.clear();
   }
 }

@@ -54,7 +54,6 @@ export class Extruder {
       normals.push(0, 0, -1);
     }
 
-    // Add triangle indices
     for (let i = 0; i < triangleIndices.length; i++) {
       indices.push(baseIndex + triangleIndices[i]);
     }

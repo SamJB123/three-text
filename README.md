@@ -317,7 +317,7 @@ The library uses a hybrid caching strategy to maximize performance while ensurin
 
 By default, it operates with glyph-level cache. The geometry for each unique character (`a`, `b`, `c`...) is generated only once and stored for reuse, avoiding redundant computation
 
-For text with tight tracking, connected scripts, or complex kerning pairs, individual glyphs can overlap. When an overlap within a word is found, the entire word is treated as a single unit and escalated to a word-level cache. All of its glyphs are tessellated together to correctly resolve the overlaps, and the resulting geometry for the word is cached
+For text with tight tracking, connected scripts, or complex kerning pairs, individual glyphs can overlap. The system detects overlaps within each word and handles them at the sub-cluster level: only the specific glyphs that overlap are tessellated together as a group, while non-overlapping glyphs in the same word continue to use individual glyph caching
 
 
 #### Flat geometry mode

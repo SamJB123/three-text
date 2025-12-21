@@ -22,9 +22,14 @@ export class BoundaryClusterer {
       glyphCount: glyphContoursList.length
     });
 
-    if (glyphContoursList.length === 0) {
+    const n = glyphContoursList.length;
+    if (n === 0) {
       perfLogger.end('BoundaryClusterer.cluster');
       return [];
+    }
+    if (n === 1) {
+      perfLogger.end('BoundaryClusterer.cluster');
+      return [[0]];
     }
 
     const result = this.clusterSweepLine(glyphContoursList, positions);
@@ -37,7 +42,6 @@ export class BoundaryClusterer {
     positions: Vec3[]
   ): number[][] {
     const n = glyphContoursList.length;
-    if (n <= 1) return n === 0 ? [] : [[0]];
 
     const bounds = new Array<BBox>(n);
     const events = new Array<[number, number, number]>(2 * n);
@@ -63,7 +67,6 @@ export class BoundaryClusterer {
       const py = find(y);
       if (px === py) return;
 
-      // Union by rank, attach smaller tree under larger tree
       if (rank[px] < rank[py]) {
         parent[px] = py;
       } else if (rank[px] > rank[py]) {
@@ -80,8 +83,6 @@ export class BoundaryClusterer {
       if (eventType === 0) {
         const bounds1 = bounds[glyphIndex];
 
-        // Check y-overlap with all currently active glyphs
-        // (x-overlap is guaranteed by the sweep line)
         for (const activeIndex of active) {
           const bounds2 = bounds[activeIndex];
 
@@ -102,10 +103,12 @@ export class BoundaryClusterer {
     const clusters = new Map<number, number[]>();
     for (let i = 0; i < n; i++) {
       const root = find(i);
-      if (!clusters.has(root)) {
-        clusters.set(root, []);
+      let list = clusters.get(root);
+      if (!list) {
+        list = [];
+        clusters.set(root, list);
       }
-      clusters.get(root)!.push(i);
+      list.push(i);
     }
 
     return Array.from(clusters.values());
