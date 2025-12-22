@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.15]
+
+### Fixed
+
+Normal direction fixed for depth=0
+
 ## [0.2.14]
 
 ### Fixed

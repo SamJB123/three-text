@@ -52,7 +52,7 @@ export class Extruder {
 
         normals[vPos] = 0;
         normals[vPos + 1] = 0;
-        normals[vPos + 2] = -1;
+        normals[vPos + 2] = 1;
         vPos += 3;
       }
 
@@ -76,7 +76,7 @@ export class Extruder {
 
       normals[base] = 0;
       normals[base + 1] = 0;
-      normals[base + 2] = -1;
+      normals[base + 2] = 1;
     }
 
     // Fill back vertices/normals (numPoints..2*numPoints-1)
@@ -88,7 +88,7 @@ export class Extruder {
 
       normals[base] = 0;
       normals[base + 1] = 0;
-      normals[base + 2] = 1;
+      normals[base + 2] = -1;
     }
 
     // Front indices

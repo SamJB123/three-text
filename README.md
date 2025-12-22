@@ -322,7 +322,7 @@ For text with tight tracking, connected scripts, or complex kerning pairs, indiv
 
 #### Flat geometry mode
 
-When `depth` is 0, the library generates single-sided geometry and relies on `THREE.DoubleSide` materials for back face rendering, reducing triangles by approximately 50%. Custom shaders may need to handle normal flipping for consistent lighting on both sides
+When `depth` is 0, the library generates single-sided geometry with normals pointing toward the camera (positive Z direction), reducing triangles by approximately 50% compared to extruded geometry
 
 
 ## Configuration
