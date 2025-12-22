@@ -2,7 +2,6 @@ import { ExtractedMetrics, FontMetrics, VerticalMetrics } from '../types';
 import {
   FONT_SIGNATURE_TRUE_TYPE,
   FONT_SIGNATURE_OPEN_TYPE_CFF,
-  FONT_SIGNATURE_TRUE_TYPE_COLLECTION,
   TABLE_TAG_HEAD,
   TABLE_TAG_HHEA,
   TABLE_TAG_OS2,
@@ -14,6 +13,7 @@ import {
   TABLE_TAG_GSUB,
   TABLE_TAG_GPOS
 } from './constants';
+import { parseTableDirectory } from './TableDirectory';
 
 export class FontMetadataExtractor {
   public static extractMetadata(fontBuffer: ArrayBuffer): ExtractedMetrics {
@@ -26,48 +26,27 @@ export class FontMetadataExtractor {
 
     const validSignatures = [
       FONT_SIGNATURE_TRUE_TYPE,
-      FONT_SIGNATURE_OPEN_TYPE_CFF,
-      FONT_SIGNATURE_TRUE_TYPE_COLLECTION
+      FONT_SIGNATURE_OPEN_TYPE_CFF
     ];
 
     if (!validSignatures.includes(sfntVersion)) {
       throw new Error(
-        `Invalid font format. Expected TrueType or OpenType, got signature: 0x${sfntVersion.toString(
+        `Invalid font format. Expected TTF/OTF (or WOFF), got signature: 0x${sfntVersion.toString(
           16
         )}`
       );
     }
 
-    const numTables = view.getUint16(4); // OpenType header - number of tables is at offset 4
+    const tableDirectory = parseTableDirectory(view);
 
-    let isCFF = false;
-    let headTableOffset = 0;
-    let hheaTableOffset = 0;
-    let os2TableOffset = 0;
-    let statTableOffset = 0;
-    let nameTableOffset = 0;
-    let fvarTableOffset = 0;
-
-    for (let i = 0; i < numTables; i++) {
-      const offset = 12 + i * 16;
-      const tag = view.getUint32(offset);
-
-      if (tag === TABLE_TAG_CFF || tag === TABLE_TAG_CFF2) {
-        isCFF = true;
-      } else if (tag === TABLE_TAG_HEAD) {
-        headTableOffset = view.getUint32(offset + 8);
-      } else if (tag === TABLE_TAG_HHEA) {
-        hheaTableOffset = view.getUint32(offset + 8);
-      } else if (tag === TABLE_TAG_OS2) {
-        os2TableOffset = view.getUint32(offset + 8);
-      } else if (tag === TABLE_TAG_FVAR) {
-        fvarTableOffset = view.getUint32(offset + 8);
-      } else if (tag === TABLE_TAG_STAT) {
-        statTableOffset = view.getUint32(offset + 8);
-      } else if (tag === TABLE_TAG_NAME) {
-        nameTableOffset = view.getUint32(offset + 8);
-      }
-    }
+    const isCFF =
+      tableDirectory.has(TABLE_TAG_CFF) || tableDirectory.has(TABLE_TAG_CFF2);
+    const headTableOffset = tableDirectory.get(TABLE_TAG_HEAD)?.offset ?? 0;
+    const hheaTableOffset = tableDirectory.get(TABLE_TAG_HHEA)?.offset ?? 0;
+    const os2TableOffset = tableDirectory.get(TABLE_TAG_OS2)?.offset ?? 0;
+    const fvarTableOffset = tableDirectory.get(TABLE_TAG_FVAR)?.offset ?? 0;
+    const statTableOffset = tableDirectory.get(TABLE_TAG_STAT)?.offset ?? 0;
+    const nameTableOffset = tableDirectory.get(TABLE_TAG_NAME)?.offset ?? 0;
 
     const unitsPerEm = headTableOffset
       ? view.getUint16(headTableOffset + 18)
@@ -118,24 +97,11 @@ export class FontMetadataExtractor {
     fontBuffer: ArrayBuffer
   ): { tags: string[]; names: { [tag: string]: string } } | undefined {
     const view = new DataView(fontBuffer);
-    const numTables = view.getUint16(4);
 
-    let gsubTableOffset = 0;
-    let gposTableOffset = 0;
-    let nameTableOffset = 0;
-
-    for (let i = 0; i < numTables; i++) {
-      const offset = 12 + i * 16;
-      const tag = view.getUint32(offset);
-
-      if (tag === TABLE_TAG_GSUB) {
-        gsubTableOffset = view.getUint32(offset + 8);
-      } else if (tag === TABLE_TAG_GPOS) {
-        gposTableOffset = view.getUint32(offset + 8);
-      } else if (tag === TABLE_TAG_NAME) {
-        nameTableOffset = view.getUint32(offset + 8);
-      }
-    }
+    const tableDirectory = parseTableDirectory(view);
+    const gsubTableOffset = tableDirectory.get(TABLE_TAG_GSUB)?.offset ?? 0;
+    const gposTableOffset = tableDirectory.get(TABLE_TAG_GPOS)?.offset ?? 0;
+    const nameTableOffset = tableDirectory.get(TABLE_TAG_NAME)?.offset ?? 0;
 
     const features = new Set<string>();
     const featureNames: { [tag: string]: string } = {};

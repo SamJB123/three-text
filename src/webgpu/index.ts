@@ -14,8 +14,7 @@ export interface WebGPUBufferSet {
     vertex: GPUVertexBufferLayout;
     color?: GPUVertexBufferLayout;
   };
-  indexFormat: GPUIndexFormat;
-  vertexCount: number;
+  indexCount: number;
   dispose(): void;
 }
 
@@ -24,7 +23,9 @@ export function createWebGPUBuffers(
   textGeometry: TextGeometryInfo
 ): WebGPUBufferSet {
   const { vertices, normals, indices, colors } = textGeometry;
-  const vertexCount = indices.length;
+  const indexCount = indices.length;
+  const indexFormat: GPUIndexFormat =
+    indices instanceof Uint16Array ? 'uint16' : 'uint32';
 
   // Interleave position and normal data for better cache coherency
   // Layout: [px, py, pz, nx, ny, nz, px, py, pz, nx, ny, nz, ...]
@@ -53,7 +54,7 @@ export function createWebGPUBuffers(
   new Float32Array(vertexBuffer.getMappedRange()).set(interleavedData);
   vertexBuffer.unmap();
 
-  // Create index buffer (NO FLIP - pass through)
+  // Create index buffer
   const indexBuffer = device.createBuffer({
     size: indices.byteLength,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
@@ -119,8 +120,7 @@ export function createWebGPUBuffers(
   return {
     buffers,
     layout,
-    indexFormat: 'uint32',
-    vertexCount,
+    indexCount,
     dispose() {
       vertexBuffer.destroy();
       indexBuffer.destroy();

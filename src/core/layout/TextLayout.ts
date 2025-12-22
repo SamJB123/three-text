@@ -83,6 +83,7 @@ export class TextLayout {
         disableShortLineDetection,
         shortLineThreshold,
         unitsPerEm: this.loadedFont.upem,
+        letterSpacing,
         measureText: (textToMeasure: string) =>
           TextMeasurer.measureTextWidth(
             this.loadedFont,
@@ -96,10 +97,12 @@ export class TextLayout {
       lines = [];
       let currentIndex = 0;
       for (const line of linesArray) {
+        const originalEnd =
+          line.length === 0 ? currentIndex : currentIndex + line.length - 1;
         lines.push({
           text: line,
           originalStart: currentIndex,
-          originalEnd: currentIndex + line.length - 1,
+          originalEnd,
           xOffset: 0
         });
         currentIndex += line.length + 1;

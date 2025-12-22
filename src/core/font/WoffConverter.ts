@@ -75,7 +75,6 @@ export class WoffConverter {
     sfntView.setUint16(10, numTables * 16 - searchRange);
 
     // Read and decompress table directory
-    let woffOffset = 44; // Start of table directory
     let sfntOffset = 12 + numTables * 16; // Start of table data
 
     const tableDirectory: Array<{

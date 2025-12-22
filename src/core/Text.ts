@@ -10,6 +10,7 @@ import type {
   TextOptions,
   GlyphGeometryInfo,
   TextGeometryInfo,
+  TextHandle,
   FontMetrics,
   LoadedFont,
   HarfBuzzInstance,
@@ -26,7 +27,7 @@ import { loadPattern } from '../hyphenation/HyphenationPatternLoader';
 import type { HyphenationTrieNode } from '../hyphenation';
 import { GlyphGeometryBuilder } from './cache/GlyphGeometryBuilder';
 import { TextShaper } from './shaping/TextShaper';
-import { globalGlyphCache, GlyphCache } from './cache/GlyphCache';
+import { globalGlyphCache, createGlyphCache } from './cache/sharedCaches';
 import { HarfBuzzLoader } from './shaping/HarfBuzzLoader';
 import { TextRangeQuery } from './layout/TextRangeQuery';
 
@@ -37,15 +38,20 @@ declare global {
   }
 }
 
-interface TextConfig {
-  maxCacheSizeMB?: number;
-}
-
 export class Text {
   private static patternCache = new Map<string, HyphenationTrieNode>();
   private static hbInitPromise: Promise<HarfBuzzInstance> | null = null;
   private static fontCache = new Map<string, LoadedFont>();
+  private static fontCacheMemoryBytes = 0;
+  private static maxFontCacheMemoryBytes = Infinity;
   private static fontIdCounter = 0;
+
+  // Stringify with sorted keys for cache stability
+  private static stableStringify(obj: { [key: string]: any }): string {
+    const keys = Object.keys(obj).sort();
+    const pairs = keys.map(k => `${k}:${obj[k]}`);
+    return pairs.join(',');
+  }
 
   private fontLoader: FontLoader;
   private loadedFont?: LoadedFont;
@@ -54,7 +60,7 @@ export class Text {
   private textShaper?: TextShaper;
   private textLayout?: TextLayout;
 
-  private constructor(config?: TextConfig) {
+  private constructor() {
     if (!Text.hbInitPromise) {
       Text.hbInitPromise = HarfBuzzLoader.getHarfBuzz();
     }
@@ -81,26 +87,7 @@ export class Text {
 
   public static async create(
     options: TextOptions
-  ): Promise<
-    TextGeometryInfo &
-      Pick<
-        Text,
-        | 'getLoadedFont'
-        | 'getCacheStatistics'
-        | 'clearCache'
-        | 'measureTextWidth'
-      > & {
-        update: (
-          options: Partial<TextOptions>
-        ) => Promise<
-          TextGeometryInfo &
-            Pick<
-              Text,
-              'getLoadedFont' | 'getCacheStatistics' | 'clearCache' | 'measureTextWidth'
-            > & { update: (options: Partial<TextOptions>) => Promise<any> }
-        >;
-      }
-  > {
+  ): Promise<TextHandle> {
     if (!options.font) {
       throw new Error(
         'Font is required. Specify options.font as a URL string or ArrayBuffer.'
@@ -114,7 +101,7 @@ export class Text {
 
     const loadedFont = await Text.resolveFont(options);
 
-    const text = new Text({ maxCacheSizeMB: options.maxCacheSizeMB });
+    const text = new Text();
     text.setLoadedFont(loadedFont);
 
     // Initial creation
@@ -183,10 +170,10 @@ export class Text {
 
     let fontKey = baseFontKey;
     if (options.fontVariations) {
-      fontKey += `_var_${JSON.stringify(options.fontVariations)}`;
+      fontKey += `_var_${Text.stableStringify(options.fontVariations)}`;
     }
     if (options.fontFeatures) {
-      fontKey += `_feat_${JSON.stringify(options.fontFeatures)}`;
+      fontKey += `_feat_${Text.stableStringify(options.fontFeatures)}`;
     }
 
     let loadedFont = Text.fontCache.get(fontKey);
@@ -211,17 +198,58 @@ export class Text {
     await tempText.loadFont(font, fontVariations, fontFeatures);
     const loadedFont = tempText.getLoadedFont()!;
     Text.fontCache.set(fontKey, loadedFont);
+    Text.trackFontCacheAdd(loadedFont);
+    Text.enforceFontCacheMemoryLimit();
     return loadedFont;
+  }
+
+  private static trackFontCacheAdd(loadedFont: LoadedFont) {
+    const size = loadedFont._buffer?.byteLength ?? 0;
+    Text.fontCacheMemoryBytes += size;
+  }
+
+  private static trackFontCacheRemove(fontKey: string) {
+    const font = Text.fontCache.get(fontKey);
+    if (!font) return;
+    const size = font._buffer?.byteLength ?? 0;
+    Text.fontCacheMemoryBytes -= size;
+    if (Text.fontCacheMemoryBytes < 0) Text.fontCacheMemoryBytes = 0;
+  }
+
+  private static enforceFontCacheMemoryLimit(): void {
+    if (Text.maxFontCacheMemoryBytes === Infinity) return;
+    while (
+      Text.fontCacheMemoryBytes > Text.maxFontCacheMemoryBytes &&
+      Text.fontCache.size > 0
+    ) {
+      const firstKey = Text.fontCache.keys().next().value;
+      if (firstKey === undefined) break;
+      Text.trackFontCacheRemove(firstKey);
+      Text.fontCache.delete(firstKey);
+    }
   }
 
   private static generateFontContentHash(buffer?: ArrayBuffer): string {
     if (buffer) {
-      // Hash of first and last bytes plus length for uniqueness
+      // FNV-1a hash sampling 32 points
       const view = new Uint8Array(buffer);
-      return `${view[0]}_${view[Math.floor(view.length / 2)]}_${view[view.length - 1]}_${view.length}`;
+      let hash = 2166136261;
+      
+      const samplePoints = Math.min(32, view.length);
+      const step = Math.floor(view.length / samplePoints);
+      
+      for (let i = 0; i < samplePoints; i++) {
+        const index = i * step;
+        hash ^= view[index];
+        hash = Math.imul(hash, 16777619);
+      }
+      
+      hash ^= view.length;
+      hash = Math.imul(hash, 16777619);
+      
+      return (hash >>> 0).toString(36);
     } else {
-      // Fallback to counter if no buffer available
-      return `${++Text.fontIdCounter}`;
+      return `c${++Text.fontIdCounter}`;
     }
   }
 
@@ -231,10 +259,10 @@ export class Text {
     const contentHash = Text.generateFontContentHash(loadedFont._buffer);
     this.currentFontId = `font_${contentHash}`;
     if (loadedFont.fontVariations) {
-      this.currentFontId += `_var_${JSON.stringify(loadedFont.fontVariations)}`;
+      this.currentFontId += `_var_${Text.stableStringify(loadedFont.fontVariations)}`;
     }
     if (loadedFont.fontFeatures) {
-      this.currentFontId += `_feat_${JSON.stringify(loadedFont.fontFeatures)}`;
+      this.currentFontId += `_feat_${Text.stableStringify(loadedFont.fontFeatures)}`;
     }
   }
 
@@ -281,10 +309,10 @@ export class Text {
       const contentHash = Text.generateFontContentHash(fontBuffer);
       this.currentFontId = `font_${contentHash}`;
       if (fontVariations) {
-        this.currentFontId += `_var_${JSON.stringify(fontVariations)}`;
+        this.currentFontId += `_var_${Text.stableStringify(fontVariations)}`;
       }
       if (fontFeatures) {
-        this.currentFontId += `_feat_${JSON.stringify(fontFeatures)}`;
+        this.currentFontId += `_feat_${Text.stableStringify(fontFeatures)}`;
       }
     } catch (error) {
       logger.error('Failed to load font:', error);
@@ -318,7 +346,7 @@ export class Text {
 
       if (!this.geometryBuilder) {
         const cache = options.maxCacheSizeMB
-          ? new GlyphCache(options.maxCacheSizeMB)
+          ? createGlyphCache(options.maxCacheSizeMB)
           : globalGlyphCache;
         this.geometryBuilder = new GlyphGeometryBuilder(
           cache,
@@ -477,8 +505,8 @@ export class Text {
   private updateFontVariations(options: TextOptions): void {
     if (options.fontVariations && this.loadedFont) {
       if (
-        JSON.stringify(options.fontVariations) !==
-        JSON.stringify(this.loadedFont.fontVariations)
+        Text.stableStringify(options.fontVariations) !==
+        Text.stableStringify(this.loadedFont.fontVariations || {})
       ) {
         this.loadedFont.font.setVariations(options.fontVariations);
         this.loadedFont.fontVariations = options.fontVariations;
@@ -529,7 +557,13 @@ export class Text {
       widthInFontUnits = width * (this.loadedFont.upem / size);
     }
 
-    const depthInFontUnits = depth * (this.loadedFont.upem / size);
+    // Keep depth behavior consistent with Extruder: extremely small non-zero depths
+    // are clamped to a minimum back offset so the back face is not coplanar.
+    const depthScale = this.loadedFont.upem / size;
+    const rawDepthInFontUnits = depth * depthScale;
+    const minExtrudeDepth = this.loadedFont.upem * 0.000025;
+    const depthInFontUnits =
+      rawDepthInFontUnits <= 0 ? 0 : Math.max(rawDepthInFontUnits, minExtrudeDepth);
 
     if (!this.textLayout) {
       this.textLayout = new TextLayout(this.loadedFont);
@@ -826,6 +860,17 @@ export class Text {
     pattern: HyphenationTrieNode
   ): void {
     Text.patternCache.set(language, pattern);
+  }
+
+  public static clearFontCache(): void {
+    Text.fontCache.clear();
+    Text.fontCacheMemoryBytes = 0;
+  }
+
+  public static setMaxFontCacheMemoryMB(limitMB: number): void {
+    Text.maxFontCacheMemoryBytes =
+      limitMB === Infinity ? Infinity : Math.max(1, Math.floor(limitMB)) * 1024 * 1024;
+    Text.enforceFontCacheMemoryLimit();
   }
 
   public getLoadedFont(): LoadedFont | undefined {

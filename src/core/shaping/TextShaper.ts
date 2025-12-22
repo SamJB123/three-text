@@ -52,21 +52,24 @@ export class TextShaper {
     perfLogger.start('TextShaper.shapeLines', {
       lineCount: lineInfos.length
     });
+    try {
+      const clustersByLine: GlyphCluster[][] = [];
 
-    const clustersByLine: GlyphCluster[][] = [];
-
-    lineInfos.forEach((lineInfo, lineIndex) => {
-      const clusters = this.shapeLineIntoClusters(
-        lineInfo,
-        lineIndex,
-        scaledLineHeight,
-        letterSpacing,
-        align,
-        direction
-      );
-      clustersByLine.push(clusters);
-    });
-    return clustersByLine;
+      lineInfos.forEach((lineInfo, lineIndex) => {
+        const clusters = this.shapeLineIntoClusters(
+          lineInfo,
+          lineIndex,
+          scaledLineHeight,
+          letterSpacing,
+          align,
+          direction
+        );
+        clustersByLine.push(clusters);
+      });
+      return clustersByLine;
+    } finally {
+      perfLogger.end('TextShaper.shapeLines');
+    }
   }
 
   private shapeLineIntoClusters(

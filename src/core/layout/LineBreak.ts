@@ -162,6 +162,9 @@ export interface LineBreakOptions {
   respectExistingBreaks?: boolean;
   hyphenationPatterns?: HyphenationPatternsMap;
   unitsPerEm?: number;
+  // Letter spacing as a fraction of em. Used to correct trailing spacing at line ends because
+  // measureText() includes trailing spacing for token composability
+  letterSpacing?: number;
 
   // Max badness with hyphenation in second pass (TeX default: 800)
   tolerance?: number;
@@ -209,6 +212,8 @@ interface LineBreakContext {
   exHyphenPenalty: number;
   currentAlign: TextAlign;
   unitsPerEm?: number;
+  // Letter spacing in font units. Used to correct trailing spacing at line ends.
+  letterSpacingFU?: number;
 }
 
 // TeX defaults
@@ -822,6 +827,7 @@ export class LineBreak {
       measureText,
       hyphenationPatterns,
       unitsPerEm,
+      letterSpacing = 0,
       tolerance = DEFAULT_TOLERANCE,
       pretolerance = DEFAULT_PRETOLERANCE,
       emergencyStretch = DEFAULT_EMERGENCY_STRETCH,
@@ -909,7 +915,11 @@ export class LineBreak {
       hyphenPenalty: hyphenpenalty,
       exHyphenPenalty: exhyphenpenalty,
       currentAlign: align,
-      unitsPerEm
+      unitsPerEm,
+      // measureText() includes trailing letter spacing after the final glyph of a token.
+      // Shaping applies letter spacing only between glyphs, so we subtract one
+      // trailing letterSpacingFU per line segment (see computeAdjustmentRatio/createLines).
+      letterSpacingFU: unitsPerEm ? letterSpacing * unitsPerEm : 0
     };
 
     if (!width || width === Infinity) {
@@ -1264,17 +1274,12 @@ export class LineBreak {
 
     const isForcedBreak = penalty <= -Infinity;
 
-    let consideredNodes = 0;
-    let acceptedBreaks = 0;
-
     const allActiveNodes = activeNodes.getAllActive();
 
     for (let i = 0; i < allActiveNodes.length; i++) {
       const node = allActiveNodes[i];
 
       if (!node.active) continue;
-
-      consideredNodes++;
 
       const adjustmentData = LineBreak.computeAdjustmentRatio(
         items,
@@ -1405,7 +1410,6 @@ export class LineBreak {
           existingNode.totalDemerits = totalDemerits;
           existingNode.previous = node;
           existingNode.totalWidth = totalWidth;
-          acceptedBreaks++;
         }
       } else {
         activeNodes.insert({
@@ -1417,7 +1421,6 @@ export class LineBreak {
           previous: node,
           active: true
         });
-        acceptedBreaks++;
       }
     }
   }
@@ -1434,7 +1437,7 @@ export class LineBreak {
       shrinks: number[];
       minWidths: number[];
     },
-    _context?: LineBreakContext
+    context?: LineBreakContext
   ): {
     ratio: number;
     adjustment: number;
@@ -1490,6 +1493,13 @@ export class LineBreak {
         items[lineEnd].type === ItemType.PENALTY
           ? items[lineEnd].width
           : (items[lineEnd] as Discretionary).preBreakWidth;
+    }
+
+    // Correct for trailing letter spacing at the end of the line segment.
+    // Our token measurement includes letter spacing after the final glyph;
+    // shaping does not add letter spacing after the final glyph in a line.
+    if (context?.letterSpacingFU && totalWidth !== 0) {
+      totalWidth -= context.letterSpacingFU;
     }
 
     const adjustment = lineWidth - totalWidth;
@@ -1701,6 +1711,11 @@ export class LineBreak {
 
       const lineText = lineTextParts.join('');
 
+      // Correct for trailing letter spacing at the end of the line.
+      if (context?.letterSpacingFU && naturalWidth !== 0) {
+        naturalWidth -= context.letterSpacingFU;
+      }
+
       let xOffset = 0;
       let adjustmentRatio = 0;
 
@@ -1774,6 +1789,11 @@ export class LineBreak {
       }
 
       const finalLineText = finalLineTextParts.join('');
+
+      // Correct for trailing letter spacing at the end of the final line.
+      if (context?.letterSpacingFU && finalNaturalWidth !== 0) {
+        finalNaturalWidth -= context.letterSpacingFU;
+      }
 
       let finalXOffset = 0;
       let finalEffectiveAlign = align;

@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.2.14]
+
+### Fixed
+
+- Cache keys now include `curveFidelity` and `geometryOptimization` config to prevent incorrect geometry reuse when options change
+- HarfBuzz draw callbacks now shared per module to eliminate WASM function pointer leaks
+- React Three Fiber component lifecycle: material disposal now only on unmount, geometry disposal on cancellation
+- React Three Fiber `vertexColors` prop now correctly applied to default material
+- Extruder depth consistency: side walls now use the same back-face Z clamp for very small depths
+- Letter spacing: removed trailing spacing accumulation at line ends to match placement with measurement
+- Empty line index bookkeeping when width is undefined
+- TrueType Collection (TTC) fonts now properly rejected (only TTF/OTF/WOFF supported)
+- Hyphenation pattern loading now validates language codes against safe allowlist
+- `LRUCache`: Fixed linked-list invariant where head node's `prev` reference was not cleared, preventing potential corruption during eviction
+- `PerformanceLogger`: Fixed nested timing support by using unique timer keys per start operation
+- `WebGPU` adapter: Fixed interface to use `indexCount` instead of incorrect `vertexCount` property
+
+### Performance
+
+- `GlyphGeometryBuilder`: Use pre-allocated typed arrays instead of `number[].push()`
+- `Extruder`: Pre-compute buffer sizes and write directly to typed arrays
+- `Polygonizer` and `PathOptimizer`: Calculate angles using `atan2(cross, dot)` instead of two `atan2()` calls
+- `TextRangeQuery`: Bounds calculation uses scalar min/max instead of allocating `Box3` per glyph
+- Contour, word, and clustering caches now shared across `Text.create()` calls
+- Font ID generation now stable across calls
+- `updatePlaneBounds()` uses direct min/max comparisons
+
+### Changed
+
+- `Text.create()` return type simplified to named `TextHandle` interface
+- Terser configuration: enabled property mangling (with reserved public API list), 3 compression passes, unsafe optimizations, toplevel mangling
+- Cache implementation unified on `utils/LRUCache`
+- `GlyphCache.ts` removed, functionality consolidated to `sharedCaches.ts` and `types.ts`
+- Cache statistics shape changed to `CacheStats`
+- Font table directory parsing extracted to shared `parseTableDirectory()` helper
+- Depth clamping now applied consistently in layout preparation and extrusion
+- Font cache memory-based eviction policy can now be configured via `Text.setMaxFontCacheMemoryMB()`)
+
+### Added
+
+- Internal benchmark tooling in `bench/` directory
+- Text and background color pickers in all examples (ESM, UMD, React Three Fiber)
+- `Text.clearFontCache()` method to manually clear cached fonts
+- `Text.setMaxFontCacheMemoryMB()` to configure font cache memory limit
+
 ## [0.2.13]
 
 ### Changed

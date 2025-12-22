@@ -3,8 +3,7 @@ import { FontMetadataExtractor } from './FontMetadata';
 import { LoadedFont, HarfBuzzInstance } from '../types';
 import {
   FONT_SIGNATURE_TRUE_TYPE,
-  FONT_SIGNATURE_OPEN_TYPE_CFF,
-  FONT_SIGNATURE_TRUE_TYPE_COLLECTION
+  FONT_SIGNATURE_OPEN_TYPE_CFF
 } from './constants';
 import { logger } from '../../utils/Logger';
 import { WoffConverter } from './WoffConverter';
@@ -44,13 +43,12 @@ export class FontLoader {
 
     const validSignatures = [
       FONT_SIGNATURE_TRUE_TYPE,
-      FONT_SIGNATURE_OPEN_TYPE_CFF,
-      FONT_SIGNATURE_TRUE_TYPE_COLLECTION
+      FONT_SIGNATURE_OPEN_TYPE_CFF
     ];
 
     if (!validSignatures.includes(sfntVersion)) {
       throw new Error(
-        `Invalid font format. Expected TrueType or OpenType, got signature: 0x${sfntVersion.toString(
+        `Invalid font format. Expected TTF/OTF (or WOFF), got signature: 0x${sfntVersion.toString(
           16
         )}`
       );
@@ -97,7 +95,8 @@ export class FontLoader {
         isVariable,
         variationAxes,
         availableFeatures: featureData?.tags,
-        featureNames: featureData?.names
+        featureNames: featureData?.names,
+        _buffer: fontBuffer // For stable font ID generation
       };
     } catch (error) {
       logger.error('Failed to load font:', error);

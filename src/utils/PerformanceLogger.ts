@@ -24,7 +24,10 @@ class PerformanceLogger {
     if (!isLogEnabled) return;
 
     const startTime = performance.now();
-    this.activeTimers.set(name, startTime);
+    
+    // Generate unique key for nested timing support
+    const timerKey = `${name}_${startTime}`;
+    this.activeTimers.set(timerKey, startTime);
 
     this.metrics.push({
       name,
@@ -38,20 +41,31 @@ class PerformanceLogger {
     if (!isLogEnabled) return null;
 
     const endTime = performance.now();
-    const startTime = this.activeTimers.get(name);
+    
+    // Find the most recent matching timer by scanning backwards
+    let timerKey: string | undefined;
+    let startTime: number | undefined;
+    
+    for (const [key, time] of Array.from(this.activeTimers.entries()).reverse()) {
+      if (key.startsWith(`${name}_`)) {
+        timerKey = key;
+        startTime = time;
+        break;
+      }
+    }
 
-    if (startTime === undefined) {
+    if (startTime === undefined || !timerKey) {
       logger.warn(`Performance timer "${name}" was not started`);
       return null;
     }
 
     const duration = endTime - startTime;
-    this.activeTimers.delete(name);
+    this.activeTimers.delete(timerKey);
 
     // Find the metric in reverse order (most recent first)
     for (let i = this.metrics.length - 1; i >= 0; i--) {
       const metric = this.metrics[i];
-      if (metric.name === name && !metric.endTime) {
+      if (metric.name === name && metric.startTime === startTime && !metric.endTime) {
         metric.endTime = endTime;
         metric.duration = duration;
         break;

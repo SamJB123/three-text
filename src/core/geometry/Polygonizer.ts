@@ -141,10 +141,15 @@ export class Polygonizer {
           this.curveFidelityConfig.angleTolerance ??
           DEFAULT_CURVE_FIDELITY.angleTolerance!;
         if (angleTolerance > 0) {
-          let da = Math.abs(
-            Math.atan2(y3 - y2, x3 - x2) - Math.atan2(y2 - y1, x2 - x1)
+          // Angle between segments (p1->p2) and (p2->p3).
+          // Using atan2(cross, dot) avoids computing 2 separate atan2() values + wrap logic.
+          const v1x = x2 - x1;
+          const v1y = y2 - y1;
+          const v2x = x3 - x2;
+          const v2y = y3 - y2;
+          const da = Math.abs(
+            Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)
           );
-          if (da >= Math.PI) da = 2 * Math.PI - da;
 
           if (da < angleTolerance) {
             this.addPoint(x2, y2, points);
@@ -258,10 +263,14 @@ export class Polygonizer {
             this.curveFidelityConfig.angleTolerance ??
             DEFAULT_CURVE_FIDELITY.angleTolerance!;
           if (angleTolerance > 0) {
-            let da1 = Math.abs(
-              Math.atan2(y4 - y3, x4 - x3) - Math.atan2(y3 - y2, x3 - x2)
+            // Angle between segments (p2->p3) and (p3->p4)
+            const v1x = x3 - x2;
+            const v1y = y3 - y2;
+            const v2x = x4 - x3;
+            const v2y = y4 - y3;
+            const da1 = Math.abs(
+              Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)
             );
-            if (da1 >= Math.PI) da1 = 2 * Math.PI - da1;
 
             if (da1 < angleTolerance) {
               this.addPoint(x2, y2, points);
@@ -283,10 +292,14 @@ export class Polygonizer {
             this.curveFidelityConfig.angleTolerance ??
             DEFAULT_CURVE_FIDELITY.angleTolerance!;
           if (angleTolerance > 0) {
-            let da1 = Math.abs(
-              Math.atan2(y3 - y2, x3 - x2) - Math.atan2(y2 - y1, x2 - x1)
+            // Angle between segments (p1->p2) and (p2->p3)
+            const v1x = x2 - x1;
+            const v1y = y2 - y1;
+            const v2x = x3 - x2;
+            const v2y = y3 - y2;
+            const da1 = Math.abs(
+              Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)
             );
-            if (da1 >= Math.PI) da1 = 2 * Math.PI - da1;
 
             if (da1 < angleTolerance) {
               this.addPoint(x2, y2, points);
@@ -308,14 +321,23 @@ export class Polygonizer {
             this.curveFidelityConfig.angleTolerance ??
             DEFAULT_CURVE_FIDELITY.angleTolerance!;
           if (angleTolerance > 0) {
-            let da1 = Math.abs(
-              Math.atan2(y3 - y2, x3 - x2) - Math.atan2(y2 - y1, x2 - x1)
+            // da1: angle between (p1->p2) and (p2->p3)
+            const a1x = x2 - x1;
+            const a1y = y2 - y1;
+            const a2x = x3 - x2;
+            const a2y = y3 - y2;
+            const da1 = Math.abs(
+              Math.atan2(a1x * a2y - a1y * a2x, a1x * a2x + a1y * a2y)
             );
-            let da2 = Math.abs(
-              Math.atan2(y4 - y3, x4 - x3) - Math.atan2(y3 - y2, x3 - x2)
+
+            // da2: angle between (p2->p3) and (p3->p4)
+            const b1x = a2x;
+            const b1y = a2y;
+            const b2x = x4 - x3;
+            const b2y = y4 - y3;
+            const da2 = Math.abs(
+              Math.atan2(b1x * b2y - b1y * b2x, b1x * b2x + b1y * b2y)
             );
-            if (da1 >= Math.PI) da1 = 2 * Math.PI - da1;
-            if (da2 >= Math.PI) da2 = 2 * Math.PI - da2;
 
             if (da1 + da2 < angleTolerance) {
               this.addPoint(x2, y2, points);

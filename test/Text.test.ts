@@ -214,10 +214,8 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
       getCacheStats: vi.fn().mockReturnValue({
         hits: 10,
         misses: 5,
-        totalGlyphs: 15,
-        uniqueGlyphs: 8,
-        cacheSize: 8,
-        saved: 10,
+        evictions: 0,
+        size: 8,
         memoryUsage: 1024000,
         hitRate: 66.7,
         memoryUsageMB: 1.024
@@ -592,7 +590,7 @@ describe('Text Library', () => {
       expect(stats).toBeDefined();
       if (stats) {
         expect(typeof stats.memoryUsage).toBe('number');
-        expect(typeof stats.uniqueGlyphs).toBe('number');
+        expect(typeof stats.size).toBe('number');
       }
     });
 

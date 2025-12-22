@@ -69,6 +69,7 @@ function App() {
   const [fontFeatures, setFontFeatures] = useState({});
   const textMeshRef = useRef();
   const renderStartTimeRef = useRef(null);
+  const lastColorRef = useRef(null);
 
   const handleFontLoad = (fontBuffer, fontName) => {
     setCustomFont({ buffer: fontBuffer, name: fontName });
@@ -126,6 +127,8 @@ function App() {
         letterSpacing: { value: 0, min: -0.1, max: 0.2, step: 0.01 },
         direction: { value: "ltr", options: ["ltr", "rtl"] },
         depth: { value: 7, min: 0, max: 50, step: 1 },
+        color: { value: "#ffffff" },
+        backgroundColor: { value: "#111111" },
       };
 
       if (!availableFeatures || !Array.isArray(availableFeatures) || availableFeatures.length === 0) {
@@ -247,6 +250,7 @@ function App() {
   );
 
   const animationControls = useControls("Animation", {
+    wireframe: false,
     shaderMode: { value: 'wave', options: ['off', 'wave', 'flip', 'explode', 'orbit', 'twister'] },
   });
 
@@ -290,6 +294,7 @@ function App() {
       vertexColors: true,
       side: THREE.DoubleSide,
       transparent: true,
+      wireframe: animationControls.wireframe,
       defines: { USE_COLOR: "" },
     };
 
@@ -383,6 +388,7 @@ function App() {
     });
   }, [
     animationControls.shaderMode,
+    animationControls.wireframe,
     waveControls.waveHeight,
     waveControls.waveFrequency,
     flipControls.flipSpeed,
@@ -465,6 +471,42 @@ function App() {
     updateStatus(`Error: ${error.message}`, "error");
   };
 
+  const resolvedColor = useMemo(() => {
+    const v = textControls.color;
+    if (!v) return undefined;
+    if (typeof v === "string") {
+      const c = new THREE.Color(v);
+      return [c.r, c.g, c.b];
+    }
+    // Leva can also return an object; normalize if needed
+    if (typeof v === "object" && v.r !== undefined && v.g !== undefined && v.b !== undefined) {
+      const r = v.r > 1 ? v.r / 255 : v.r;
+      const g = v.g > 1 ? v.g / 255 : v.g;
+      const b = v.b > 1 ? v.b / 255 : v.b;
+      return [r, g, b];
+    }
+    return undefined;
+  }, [textControls.color]);
+
+  // Fast path: update color attribute directly when color changes
+  useEffect(() => {
+    if (!textMeshRef.current?.geometry?.attributes?.color) return;
+    if (!resolvedColor) return;
+    
+    const lastColor = lastColorRef.current;
+    if (lastColor && lastColor[0] === resolvedColor[0] && lastColor[1] === resolvedColor[1] && lastColor[2] === resolvedColor[2]) {
+      return;
+    }
+    
+    lastColorRef.current = resolvedColor;
+    
+    const colors = textMeshRef.current.geometry.attributes.color;
+    for (let i = 0; i < colors.count; i++) {
+      colors.setXYZ(i, resolvedColor[0], resolvedColor[1], resolvedColor[2]);
+    }
+    colors.needsUpdate = true;
+  }, [resolvedColor]);
+
   return (
     <>
       <div className="status status-loading">Initializing...</div>
@@ -502,7 +544,7 @@ function App() {
           powerPreference: "high-performance",
         }}
       >
-        <color attach="background" args={["#111111"]} />
+        <color attach="background" args={[textControls.backgroundColor]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[1, 1, 1]} intensity={0.8} />
 
@@ -524,6 +566,7 @@ function App() {
           depth={textControls.depth}
           lineHeight={lineBreakingControls.lineHeight}
           letterSpacing={textControls.letterSpacing}
+          color={resolvedColor}
           removeOverlaps={optimizationControls.removeOverlaps}
           separateGlyphsWithAttributes={['flip', 'explode', 'orbit', 'twister'].includes(animationControls.shaderMode)}
           curveFidelity={{

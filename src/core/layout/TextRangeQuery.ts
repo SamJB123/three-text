@@ -98,19 +98,21 @@ export class TextRangeQuery {
       };
     }
 
-    const box = new Box3Core();
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
     for (const glyph of glyphs) {
-      const glyphBox = new Box3Core(
-        new Vec3(glyph.bounds.min.x, glyph.bounds.min.y, glyph.bounds.min.z),
-        new Vec3(glyph.bounds.max.x, glyph.bounds.max.y, glyph.bounds.max.z)
-      );
-      box.union(glyphBox);
+      if (glyph.bounds.min.x < minX) minX = glyph.bounds.min.x;
+      if (glyph.bounds.min.y < minY) minY = glyph.bounds.min.y;
+      if (glyph.bounds.min.z < minZ) minZ = glyph.bounds.min.z;
+      if (glyph.bounds.max.x > maxX) maxX = glyph.bounds.max.x;
+      if (glyph.bounds.max.y > maxY) maxY = glyph.bounds.max.y;
+      if (glyph.bounds.max.z > maxZ) maxZ = glyph.bounds.max.z;
     }
 
     return {
-      min: { x: box.min.x, y: box.min.y, z: box.min.z },
-      max: { x: box.max.x, y: box.max.y, z: box.max.z }
+      min: { x: minX, y: minY, z: minZ },
+      max: { x: maxX, y: maxY, z: maxZ }
     };
   }
 }

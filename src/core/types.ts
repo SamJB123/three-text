@@ -166,6 +166,18 @@ export interface ProcessedGeometry {
   contours: number[][];
 }
 
+export interface GlyphData {
+  geometry: ProcessedGeometry;
+  vertices: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+  bounds: {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  };
+  useCount: number;
+}
+
 export interface PathInfo {
   start: number;
   count: number;
@@ -221,6 +233,14 @@ export interface TextGeometryInfo {
   };
   query(options: TextQueryOptions): TextRange[];
   coloredRanges?: ColoredRange[];
+}
+
+export interface TextHandle extends TextGeometryInfo {
+  getLoadedFont(): LoadedFont | undefined;
+  getCacheStatistics(): any;
+  clearCache(): void;
+  measureTextWidth(text: string, letterSpacing?: number): number;
+  update(options: Partial<TextOptions>): Promise<TextHandle>;
 }
 
 export interface ColorByRange {

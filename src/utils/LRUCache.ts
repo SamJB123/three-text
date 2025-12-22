@@ -14,7 +14,7 @@ export interface LRUCacheOptions<K, V> {
   onEvict?: (key: K, value: V) => void;
 }
 
-export interface LRUCacheStats {
+export interface CacheStats {
   hits: number;
   misses: number;
   evictions: number;
@@ -27,7 +27,7 @@ export class LRUCache<K, V> {
   private head: LRUNode<K, V> | null = null;
   private tail: LRUNode<K, V> | null = null;
 
-  private stats: LRUCacheStats = {
+  private stats: CacheStats = {
     hits: 0,
     misses: 0,
     evictions: 0,
@@ -132,7 +132,7 @@ export class LRUCache<K, V> {
     };
   }
 
-  getStats(): LRUCacheStats & { hitRate: number; memoryUsageMB: number } {
+  getStats(): CacheStats & { hitRate: number; memoryUsageMB: number } {
     const total = this.stats.hits + this.stats.misses;
     const hitRate = total > 0 ? (this.stats.hits / total) * 100 : 0;
     const memoryUsageMB = this.stats.memoryUsage / (1024 * 1024);
@@ -194,6 +194,9 @@ export class LRUCache<K, V> {
   }
 
   private addToHead(node: LRUNode<K, V>): void {
+    node.prev = null;
+    node.next = null;
+    
     if (!this.head) {
       this.head = this.tail = node;
     } else {

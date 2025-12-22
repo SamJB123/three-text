@@ -1,24 +1,29 @@
-import { Vec2, Vec3, Box3 as Box3Core } from '../vectors';
-import { GlyphCache, GlyphData } from './GlyphCache';
+import { Vec2, Vec3 } from '../vectors';
 import { perfLogger } from '../../utils/PerformanceLogger';
 import {
   Path,
   GlyphGeometryInfo,
   GlyphContours,
   LoadedFont,
-  GlyphCluster
+  GlyphCluster,
+  GlyphData
 } from '../types';
+import {
+  globalContourCache,
+  globalWordCache,
+  globalClusteringCache,
+  getGlyphCacheKey
+} from './sharedCaches';
 import { Tessellator } from '../geometry/Tessellator';
 import { Extruder } from '../geometry/Extruder';
 import { BoundaryClusterer } from '../geometry/BoundaryClusterer';
 import { GlyphContourCollector } from './GlyphContourCollector';
-import { DrawCallbackHandler } from '../shaping/DrawCallbacks';
+import { getSharedDrawCallbackHandler, DrawCallbackHandler } from '../shaping/DrawCallbacks';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
 import { HarfBuzzGlyph } from '../types';
 import { LRUCache } from '../../utils/LRUCache';
-
-const CONTOUR_CACHE_MAX_ENTRIES = 1000;
-const WORD_CACHE_MAX_ENTRIES = 1000;
+import { DEFAULT_CURVE_FIDELITY } from '../geometry/Polygonizer';
+import { DEFAULT_OPTIMIZATION_CONFIG } from '../geometry/PathOptimizer';
 
 export interface InstancedTextGeometry {
   vertices: Float32Array;
@@ -32,50 +37,33 @@ export interface InstancedTextGeometry {
 }
 
 export class GlyphGeometryBuilder {
-  private cache: GlyphCache;
+  private cache: LRUCache<string, GlyphData>;
   private tessellator: Tessellator;
   private extruder: Extruder;
   private fontId: string = 'default';
+  private cacheKeyPrefix: string = 'default';
+  private curveFidelityConfig?: CurveFidelityConfig;
+  private geometryOptimizationOptions?: GeometryOptimizationOptions;
   private clusterer: BoundaryClusterer;
   private collector: GlyphContourCollector;
   private drawCallbacks: DrawCallbackHandler;
   private loadedFont: LoadedFont;
   private wordCache: LRUCache<string, GlyphData>;
-  private contourCache: LRUCache<number, GlyphContours>;
+  private contourCache: LRUCache<string, GlyphContours>;
   private clusteringCache: LRUCache<string, { glyphIds: number[], groups: number[][] }>;
 
-  constructor(cache: GlyphCache, loadedFont: LoadedFont) {
+  constructor(cache: LRUCache<string, GlyphData>, loadedFont: LoadedFont) {
     this.cache = cache;
     this.loadedFont = loadedFont;
     this.tessellator = new Tessellator();
     this.extruder = new Extruder();
     this.clusterer = new BoundaryClusterer();
     this.collector = new GlyphContourCollector();
-    this.drawCallbacks = new DrawCallbackHandler();
+    this.drawCallbacks = getSharedDrawCallbackHandler(this.loadedFont);
     this.drawCallbacks.createDrawFuncs(this.loadedFont, this.collector);
-    this.contourCache = new LRUCache<number, GlyphContours>({
-      maxEntries: CONTOUR_CACHE_MAX_ENTRIES,
-      calculateSize: (contours) => {
-        let size = 0;
-        for (const path of contours.paths) {
-          size += path.points.length * 16; // Vec2 = 2 floats * 8 bytes
-        }
-        return size + 64; // bounds overhead
-      }
-    });
-    this.wordCache = new LRUCache<string, GlyphData>({
-      maxEntries: WORD_CACHE_MAX_ENTRIES,
-      calculateSize: (data) => {
-        let size = data.vertices.length * 4;
-        size += data.normals.length * 4;
-        size += data.indices.length * data.indices.BYTES_PER_ELEMENT;
-        return size;
-      }
-    });
-    this.clusteringCache = new LRUCache<string, { glyphIds: number[], groups: number[][] }>({
-      maxEntries: 2000,
-      calculateSize: () => 1
-    });
+    this.contourCache = globalContourCache;
+    this.wordCache = globalWordCache;
+    this.clusteringCache = globalClusteringCache;
   }
 
   public getOptimizationStats() {
@@ -83,15 +71,54 @@ export class GlyphGeometryBuilder {
   }
 
   public setCurveFidelityConfig(config?: CurveFidelityConfig): void {
+    this.curveFidelityConfig = config;
     this.collector.setCurveFidelityConfig(config);
+    this.updateCacheKeyPrefix();
   }
 
   public setGeometryOptimization(options?: GeometryOptimizationOptions): void {
+    this.geometryOptimizationOptions = options;
     this.collector.setGeometryOptimization(options);
+    this.updateCacheKeyPrefix();
   }
 
   public setFontId(fontId: string): void {
     this.fontId = fontId;
+    this.updateCacheKeyPrefix();
+  }
+
+  private updateCacheKeyPrefix(): void {
+    this.cacheKeyPrefix = `${this.fontId}__${this.getGeometryConfigSignature()}`;
+  }
+
+  private getGeometryConfigSignature(): string {
+    const distanceTolerance =
+      this.curveFidelityConfig?.distanceTolerance ??
+      DEFAULT_CURVE_FIDELITY.distanceTolerance!;
+    const angleTolerance =
+      this.curveFidelityConfig?.angleTolerance ??
+      DEFAULT_CURVE_FIDELITY.angleTolerance!;
+
+    const enabled =
+      this.geometryOptimizationOptions?.enabled ??
+      DEFAULT_OPTIMIZATION_CONFIG.enabled;
+    const areaThreshold =
+      this.geometryOptimizationOptions?.areaThreshold ??
+      DEFAULT_OPTIMIZATION_CONFIG.areaThreshold;
+    const colinearThreshold =
+      this.geometryOptimizationOptions?.colinearThreshold ??
+      DEFAULT_OPTIMIZATION_CONFIG.colinearThreshold;
+    const minSegmentLength =
+      this.geometryOptimizationOptions?.minSegmentLength ??
+      DEFAULT_OPTIMIZATION_CONFIG.minSegmentLength;
+
+    // Use fixed precision to keep cache keys stable and avoid float noise
+    return [
+      `cf:${distanceTolerance.toFixed(4)},${angleTolerance.toFixed(4)}`,
+      `opt:${enabled ? 1 : 0},${areaThreshold.toFixed(4)},${colinearThreshold.toFixed(
+        6
+      )},${minSegmentLength.toFixed(4)}`
+    ].join('|');
   }
 
   // Build instanced geometry from glyph contours
@@ -110,9 +137,71 @@ export class GlyphGeometryBuilder {
       removeOverlaps
     });
 
-    const vertices: number[] = [];
-    const normals: number[] = [];
-    const indices: number[] = [];
+    // Growable typed arrays; slice to final size at end
+    let vertexBuffer = new Float32Array(1024);
+    let normalBuffer = new Float32Array(1024);
+    let indexBuffer = new Uint32Array(1024);
+    let vertexPos = 0; // float index (multiple of 3)
+    let normalPos = 0; // float index (multiple of 3)
+    let indexPos = 0; // index count
+
+    const ensureFloatCapacity = (
+      buffer: Float32Array<ArrayBuffer>,
+      needed: number
+    ): Float32Array<ArrayBuffer> => {
+      if (needed <= buffer.length) return buffer;
+      let nextSize = buffer.length;
+      while (nextSize < needed) nextSize *= 2;
+      const next = new Float32Array(nextSize);
+      next.set(buffer);
+      return next;
+    };
+
+    const ensureIndexCapacity = (
+      buffer: Uint32Array<ArrayBuffer>,
+      needed: number
+    ): Uint32Array<ArrayBuffer> => {
+      if (needed <= buffer.length) return buffer;
+      let nextSize = buffer.length;
+      while (nextSize < needed) nextSize *= 2;
+      const next = new Uint32Array(nextSize);
+      next.set(buffer);
+      return next;
+    };
+
+    const appendGeometryToBuffers = (
+      data: GlyphData,
+      position: Vec3,
+      vertexOffset: number
+    ) => {
+      const v = data.vertices;
+      const n = data.normals;
+      const idx = data.indices;
+
+      // Grow buffers as needed
+      vertexBuffer = ensureFloatCapacity(vertexBuffer, vertexPos + v.length);
+      normalBuffer = ensureFloatCapacity(normalBuffer, normalPos + n.length);
+      indexBuffer = ensureIndexCapacity(indexBuffer, indexPos + idx.length);
+
+      // Vertices: translate by position
+      const px = position.x;
+      const py = position.y;
+      const pz = position.z;
+      for (let j = 0; j < v.length; j += 3) {
+        vertexBuffer[vertexPos++] = v[j] + px;
+        vertexBuffer[vertexPos++] = v[j + 1] + py;
+        vertexBuffer[vertexPos++] = v[j + 2] + pz;
+      }
+
+      // Normals: straight copy
+      normalBuffer.set(n, normalPos);
+      normalPos += n.length;
+
+      // Indices: copy with vertex offset
+      for (let j = 0; j < idx.length; j++) {
+        indexBuffer[indexPos++] = idx[j] + vertexOffset;
+      }
+    };
     const glyphInfos: GlyphGeometryInfo[] = [];
 
     const planeBounds = {
@@ -123,19 +212,18 @@ export class GlyphGeometryBuilder {
     for (let lineIndex = 0; lineIndex < clustersByLine.length; lineIndex++) {
       const line = clustersByLine[lineIndex];
       for (const cluster of line) {
-        // Step 1: Get contours for all glyphs in the cluster
         const clusterGlyphContours: GlyphContours[] = [];
         for (const glyph of cluster.glyphs) {
           clusterGlyphContours.push(this.getContoursForGlyph(glyph.g));
         }
 
-        // Step 2: Check for overlaps within the cluster
         let boundaryGroups: number[][];
         if (cluster.glyphs.length <= 1) {
           boundaryGroups = [[0]];
         } else {
           // Check clustering cache (same text + glyph IDs = same overlap groups)
-          const cacheKey = cluster.text;
+          // Key must be font-specific; glyph ids/bounds differ between fonts
+          const cacheKey = `${this.cacheKeyPrefix}_${cluster.text}`;
           const cached = this.clusteringCache.get(cacheKey);
           
           let isValid = false;
@@ -153,7 +241,7 @@ export class GlyphGeometryBuilder {
             boundaryGroups = cached.groups;
           } else {
             const relativePositions = cluster.glyphs.map(
-              (g) => new Vec3(g.x, g.y, 0)
+              (g) => new Vec3(g.x ?? 0, g.y ?? 0, 0)
             );
             boundaryGroups = this.clusterer.cluster(
               clusterGlyphContours,
@@ -173,9 +261,7 @@ export class GlyphGeometryBuilder {
             coloredTextIndices.has(g.absoluteTextIndex)
           );
 
-        // Force glyph-level caching if:
-        // - separateGlyphs flag is set (for shader attributes), OR
-        // - cluster contains selectively colored text (needs separate vertex ranges per glyph)
+        // Use glyph-level caching when separateGlyphs is set or when cluster contains colored text
         const forceSeparate = separateGlyphs || clusterHasColoredGlyphs;
 
         // Iterate over the geometric groups identified by BoundaryClusterer
@@ -205,7 +291,6 @@ export class GlyphGeometryBuilder {
                 const glyphContours = clusterGlyphContours[originalIndex];
                 const glyph = cluster.glyphs[originalIndex];
 
-                // Position relative to the sub-cluster start
                 const relX = (glyph.x ?? 0) - refX;
                 const relY = (glyph.y ?? 0) - refY;
 
@@ -236,20 +321,11 @@ export class GlyphGeometryBuilder {
               cluster.position.z
             );
 
-            const vertexOffset = vertices.length / 3;
-            this.appendGeometry(
-              vertices,
-              normals,
-              indices,
-              cachedCluster,
-              groupPosition,
-              vertexOffset
-            );
+            const vertexOffset = vertexPos / 3;
+            appendGeometryToBuffers(cachedCluster, groupPosition, vertexOffset);
 
             const clusterVertexCount = cachedCluster.vertices.length / 3;
 
-            // Register glyph infos for all glyphs in this sub-cluster
-            // They all point to the same merged geometry
             for (let i = 0; i < groupIndices.length; i++) {
               const originalIndex = groupIndices[i];
               const glyph = cluster.glyphs[originalIndex];
@@ -298,10 +374,7 @@ export class GlyphGeometryBuilder {
               }
 
               let cachedGlyph = this.cache.get(
-                this.fontId,
-                glyph.g,
-                depth,
-                removeOverlaps
+                getGlyphCacheKey(this.cacheKeyPrefix, glyph.g, depth, removeOverlaps)
               );
 
               if (!cachedGlyph) {
@@ -312,23 +385,15 @@ export class GlyphGeometryBuilder {
                   isCFF
                 );
                 this.cache.set(
-                  this.fontId,
-                  glyph.g,
-                  depth,
-                  removeOverlaps,
+                  getGlyphCacheKey(this.cacheKeyPrefix, glyph.g, depth, removeOverlaps),
                   cachedGlyph
                 );
+              } else {
+                cachedGlyph.useCount++;
               }
 
-              const vertexOffset = vertices.length / 3;
-              this.appendGeometry(
-                vertices,
-                normals,
-                indices,
-                cachedGlyph,
-                glyphPosition,
-                vertexOffset
-              );
+              const vertexOffset = vertexPos / 3;
+              appendGeometryToBuffers(cachedGlyph, glyphPosition, vertexOffset);
 
               const glyphInfo = this.createGlyphInfo(
                 glyph,
@@ -346,9 +411,10 @@ export class GlyphGeometryBuilder {
       }
     }
 
-    const vertexArray = new Float32Array(vertices);
-    const normalArray = new Float32Array(normals);
-    const indexArray = new Uint32Array(indices);
+    // Slice to used lengths (avoid returning oversized buffers)
+    const vertexArray = vertexBuffer.slice(0, vertexPos);
+    const normalArray = normalBuffer.slice(0, normalPos);
+    const indexArray = indexBuffer.slice(0, indexPos);
 
     perfLogger.end('GlyphGeometryBuilder.buildInstancedGeometry');
 
@@ -380,30 +446,7 @@ export class GlyphGeometryBuilder {
 
     const ids = parts.join('|');
     const roundedDepth = Math.round(depth * 1000) / 1000;
-    return `${this.fontId}_${ids}_${roundedDepth}_${removeOverlaps}`;
-  }
-
-  private appendGeometry(
-    vertices: number[],
-    normals: number[],
-    indices: number[],
-    data: GlyphData,
-    position: Vec3,
-    offset: number
-  ) {
-    for (let j = 0; j < data.vertices.length; j += 3) {
-      vertices.push(
-        data.vertices[j] + position.x,
-        data.vertices[j + 1] + position.y,
-        data.vertices[j + 2] + position.z
-      );
-    }
-    for (let j = 0; j < data.normals.length; j++) {
-      normals.push(data.normals[j]);
-    }
-    for (let j = 0; j < data.indices.length; j++) {
-      indices.push(data.indices[j] + offset);
-    }
+    return `${this.cacheKeyPrefix}_${ids}_${roundedDepth}_${removeOverlaps}`;
   }
 
   private createGlyphInfo(
@@ -435,11 +478,15 @@ export class GlyphGeometryBuilder {
   }
 
   private getContoursForGlyph(glyphId: number): GlyphContours {
-    const cached = this.contourCache.get(glyphId);
+    const key = `${this.cacheKeyPrefix}_${glyphId}`;
+    const cached = this.contourCache.get(key);
     if (cached) {
       return cached;
     }
 
+    // Rebind collector before draw operation
+    this.drawCallbacks.setCollector(this.collector);
+    
     this.collector.reset();
     this.collector.beginGlyph(glyphId, 0);
     this.loadedFont.module.exports.hb_font_draw_glyph(
@@ -460,7 +507,7 @@ export class GlyphGeometryBuilder {
       }
     };
 
-    this.contourCache.set(glyphId, contours);
+    this.contourCache.set(key, contours);
     return contours;
   }
 
@@ -510,14 +557,11 @@ export class GlyphGeometryBuilder {
     const boundsMin = new Vec3(minX, minY, minZ);
     const boundsMax = new Vec3(maxX, maxY, maxZ);
 
-    const vertexCount = extrudedResult.vertices.length / 3;
-    const IndexArray = vertexCount < 65536 ? Uint16Array : Uint32Array;
-
     return {
       geometry: processedGeometry,
-      vertices: new Float32Array(extrudedResult.vertices),
-      normals: new Float32Array(extrudedResult.normals),
-      indices: new IndexArray(extrudedResult.indices),
+      vertices: extrudedResult.vertices,
+      normals: extrudedResult.normals,
+      indices: extrudedResult.indices,
       bounds: { min: boundsMin, max: boundsMax },
       useCount: 1
     };
@@ -554,23 +598,18 @@ export class GlyphGeometryBuilder {
       max: { x: number; y: number; z: number };
     }
   ): void {
-    const planeBox = new Box3Core(
-      new Vec3(planeBounds.min.x, planeBounds.min.y, planeBounds.min.z),
-      new Vec3(planeBounds.max.x, planeBounds.max.y, planeBounds.max.z)
-    );
+    const pMin = planeBounds.min;
+    const pMax = planeBounds.max;
+    const gMin = glyphBounds.min;
+    const gMax = glyphBounds.max;
 
-    const glyphBox = new Box3Core(
-      new Vec3(glyphBounds.min.x, glyphBounds.min.y, glyphBounds.min.z),
-      new Vec3(glyphBounds.max.x, glyphBounds.max.y, glyphBounds.max.z)
-    );
+    if (gMin.x < pMin.x) pMin.x = gMin.x;
+    if (gMin.y < pMin.y) pMin.y = gMin.y;
+    if (gMin.z < pMin.z) pMin.z = gMin.z;
 
-    planeBox.union(glyphBox);
-    planeBounds.min.x = planeBox.min.x;
-    planeBounds.min.y = planeBox.min.y;
-    planeBounds.min.z = planeBox.min.z;
-    planeBounds.max.x = planeBox.max.x;
-    planeBounds.max.y = planeBox.max.y;
-    planeBounds.max.z = planeBox.max.z;
+    if (gMax.x > pMax.x) pMax.x = gMax.x;
+    if (gMax.y > pMax.y) pMax.y = gMax.y;
+    if (gMax.z > pMax.z) pMax.z = gMax.z;
   }
 
   public getCacheStats() {
@@ -581,5 +620,6 @@ export class GlyphGeometryBuilder {
     this.cache.clear();
     this.wordCache.clear();
     this.clusteringCache.clear();
+    this.contourCache.clear();
   }
 }

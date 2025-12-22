@@ -2,9 +2,6 @@ import type { LoadedFont } from '../types';
 import { convertFontFeaturesToString } from './fontFeatures';
 
 export class TextMeasurer {
-  // Measures text width including letter spacing
-  // (letter spacing is added uniformly after each glyph during measurement,
-  // so the widths given to the line-breaking algorithm already account for tracking)
   public static measureTextWidth(
     loadedFont: LoadedFont,
     text: string,
@@ -20,7 +17,6 @@ export class TextMeasurer {
     const glyphInfos = buffer.json(loadedFont.font);
     const letterSpacingInFontUnits = letterSpacing * loadedFont.upem;
 
-    // Calculate total advance width with letter spacing
     let totalWidth = 0;
     glyphInfos.forEach((glyph: any) => {
       totalWidth += glyph.ax;

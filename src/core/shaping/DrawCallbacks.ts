@@ -29,6 +29,10 @@ export class DrawCallbackHandler {
     }
   }
 
+  public setCollector(collector: GlyphContourCollector): void {
+    this.collector = collector;
+  }
+
   public createDrawFuncs(
     font: LoadedFont,
     collector: GlyphContourCollector
@@ -191,4 +195,18 @@ export class DrawCallbackHandler {
 
     this.collector = undefined;
   }
+}
+
+// Share a single DrawCallbackHandler per HarfBuzz module to avoid leaking
+// wasm function pointers when users create many Text instances
+const sharedDrawCallbackHandlers = new WeakMap<object, DrawCallbackHandler>();
+
+export function getSharedDrawCallbackHandler(font: LoadedFont): DrawCallbackHandler {
+  const key = font.module as unknown as object;
+  const existing = sharedDrawCallbackHandlers.get(key);
+  if (existing) return existing;
+
+  const handler = new DrawCallbackHandler();
+  sharedDrawCallbackHandlers.set(key, handler);
+  return handler;
 }

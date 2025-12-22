@@ -23,9 +23,80 @@ const licenseBanner = `/*!
  * This software includes third-party code - see LICENSE_THIRD_PARTY for details.
  */`;
 
+// Public API properties (protected from mangling)
+const reservedProps = [
+  'x', 'y', 'z', 'min', 'max',
+  // Three.js compatibility
+  'geometry', 'position', 'rotation', 'scale', 'material',
+  // Public methods and properties users access
+  'text', 'font', 'width', 'align', 'direction', 'depth',
+  'vertices', 'normals', 'indices', 'colors', 'glyphAttributes',
+  'lines', 'boundingBox', 'lineHeight', 'naturalWidth',
+  'update', 'create', 'getLoadedFont', 'getCacheStatistics', 'clearCache', 'measureTextWidth',
+  // HarfBuzz API
+  'hb', 'fontBlob', 'faceIndex', 'upem',
+  // Common patterns to preserve
+  'length', 'size', 'name', 'value', 'type', 'data', 'id',
+  // Properties accessed dynamically or via string keys
+  'metadata', 'features', 'variations',
+  // Public API return properties
+  'planeBounds', 'glyphs', 'buffer', 'path', 'query', 'stats', 'faces'
+];
+
 const terserOptions = {
+  ecma: 2020,
+  module: true,
+  toplevel: true,
+  compress: {
+    passes: 3,
+    pure_getters: true,
+    pure_funcs: ['console.log', 'console.warn'],
+    drop_console: false,
+    drop_debugger: true,
+    unsafe: true,
+    unsafe_proto: true,
+    unsafe_arrows: true,
+    unsafe_methods: true,
+    unsafe_math: true,
+    unsafe_comps: true,
+    unsafe_undefined: true,
+    unsafe_regexp: true,
+    conditionals: true,
+    dead_code: true,
+    evaluate: true,
+    booleans: true,
+    loops: true,
+    unused: true,
+    toplevel: true,
+    if_return: true,
+    inline: 3,
+    reduce_vars: true,
+    reduce_funcs: true,
+    collapse_vars: true,
+    hoist_funs: true,
+    hoist_vars: false,
+    hoist_props: true,
+    join_vars: true,
+    sequences: true,
+    side_effects: true,
+    comparisons: true,
+    negate_iife: true,
+    keep_fargs: false
+  },
+  mangle: {
+    safari10: false,
+    properties: {
+      regex: /^[a-z_][a-zA-Z0-9_]*$/, // Mangle internal properties (not starting with capitals)
+      reserved: reservedProps
+    }
+  },
   format: {
-    comments: /^!/
+    comments: /^!/,
+    ascii_only: false,
+    ecma: 2020,
+    semicolons: false,
+    wrap_iife: true,
+    wrap_func_args: false
   }
 };
 
@@ -154,19 +225,7 @@ const umdConfig = {
       file: 'dist/index.umd.min.js',
       format: 'umd',
       name: 'ThreeText',
-      plugins: [
-        terser({
-          ...terserOptions,
-          // Preserve variable names to avoid scoping issues
-          mangle: {
-            keep_fnames: true,
-            keep_classnames: true
-          },
-          compress: {
-            keep_fargs: true
-          }
-        })
-      ],
+      plugins: [terser(terserOptions)],
       sourcemap: false,
       banner: licenseBanner,
       globals: {

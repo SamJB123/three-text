@@ -266,6 +266,11 @@
           status.className = `status-${type}`;
         }
 
+        function hexToRgb(hex) {
+          const color = new THREE.Color(hex);
+          return [color.r, color.g, color.b];
+        }
+
         let camera, renderer, controls, textMesh;
         let isRendering = false;
         let currentTextInstance = null;
@@ -294,6 +299,9 @@
           direction: "ltr",
           depth: 7,
           alignment: "justify",
+          wireframe: false,
+          textColor: "#ffffff",
+          backgroundColor: "#111111",
           optimizationEnabled: true,
           areaThreshold: 1.0,
           colinearThreshold: 0.0087,
@@ -398,7 +406,7 @@
                 float diffuse = max(dot(normal, lightDirection), 0.0);
                 float ambient = 0.5;
                 float lightIntensity = ambient + diffuse * 0.5;
-                vec3 baseColor = length(vColor) > 0.0 ? vColor : vec3(1.0);
+                vec3 baseColor = vColor;
                 
                 vec3 finalColor = baseColor * lightIntensity;
                 
@@ -754,7 +762,7 @@
                 float diffuse = max(dot(normal, lightDirection), 0.0);
                 float ambient = 0.5;
                 float lightIntensity = ambient + diffuse * 0.5;
-                vec3 baseColor = length(vColor) > 0.0 ? vColor : vec3(1.0);
+                vec3 baseColor = vColor;
 
                 vec3 finalColor = baseColor * lightIntensity;
 
@@ -829,6 +837,41 @@
             .add(params, "depth", 0, 50, 1)
             .name("Depth")
             .onChange(debouncedRender);
+          textFolder
+            .addColor(params, "textColor")
+            .name("Text color")
+            .onChange((value) => {
+              // Fast path: update color attribute directly without re-tessellation
+              if (textMesh && textMesh.geometry.attributes.color) {
+                const rgb = hexToRgb(value);
+                const colors = textMesh.geometry.attributes.color;
+                for (let i = 0; i < colors.count; i++) {
+                  colors.setXYZ(i, rgb[0], rgb[1], rgb[2]);
+                }
+                colors.needsUpdate = true;
+              } else {
+                // No color attribute yet, need full render
+                debouncedRender();
+              }
+            });
+          textFolder
+            .addColor(params, "backgroundColor")
+            .name("Background")
+            .onChange((value) => {
+              scene.background.set(value);
+            });
+          textFolder
+            .add(params, "wireframe")
+            .name("Wireframe")
+            .onChange((value) => {
+              if (textMesh && textMesh.material) {
+                if (Array.isArray(textMesh.material)) {
+                  textMesh.material.forEach(m => m.wireframe = value);
+                } else {
+                  textMesh.material.wireframe = value;
+                }
+              }
+            });
 
           const animationFolder = gui.addFolder("Animation");
           animationFolder
@@ -1070,6 +1113,7 @@
             vertexColors: true,
             side: THREE.DoubleSide,
             transparent: true,
+            wireframe: params.wireframe,
             defines: {
               USE_COLOR: "",
             },
@@ -1231,6 +1275,7 @@
 
             const startTime = performance.now();
             let result;
+            const textColorRgb = hexToRgb(params.textColor);
             
             if (currentTextInstance) {
               // For updates, just pass everything - API handles font cache internally
@@ -1241,6 +1286,7 @@
                 depth: params.depth,
                 lineHeight: params.lineHeight,
                 letterSpacing: params.letterSpacing,
+                color: textColorRgb,
                 fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
                 fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
                 removeOverlaps: params.removeOverlaps,
@@ -1287,6 +1333,7 @@
                 depth: params.depth,
                 lineHeight: params.lineHeight,
                 letterSpacing: params.letterSpacing,
+                color: textColorRgb,
                 fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
                 fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
                 removeOverlaps: params.removeOverlaps,

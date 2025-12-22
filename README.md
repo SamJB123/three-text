@@ -900,9 +900,9 @@ const stats = text.getCacheStatistics();
 console.log('Cache Statistics:', {
   hitRate: stats.hitRate,                // Cache hit percentage
   memoryUsageMB: stats.memoryUsageMB,    // Memory used in MB
-  uniqueGlyphs: stats.uniqueGlyphs,      // Distinct cached glyphs
-  totalGlyphs: stats.totalGlyphs,        // Total glyphs processed
-  saved: stats.saved                     // Tessellations avoided
+  size: stats.size,                      // Entries in cache
+  hits: stats.hits,                      // Cache hits
+  misses: stats.misses                   // Cache misses
 });
 ```
 

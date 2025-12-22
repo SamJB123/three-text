@@ -175,16 +175,23 @@ export class PathOptimizer {
       const current = points[i];
       const next = points[i + 1];
 
-      const v1 = new Vec2(current.x - prev.x, current.y - prev.y);
-      const v2 = new Vec2(next.x - current.x, next.y - current.y);
+      const v1x = current.x - prev.x;
+      const v1y = current.y - prev.y;
+      const v2x = next.x - current.x;
+      const v2y = next.y - current.y;
 
-      const angle = Math.abs(v1.angle() - v2.angle());
-      const normalizedAngle = Math.min(angle, 2 * Math.PI - angle);
+      const angle = Math.abs(
+        Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)
+      );
+
+      const v1LenSq = v1x * v1x + v1y * v1y;
+      const v2LenSq = v2x * v2x + v2y * v2y;
+      const minLenSq = this.config.minSegmentLength * this.config.minSegmentLength;
 
       if (
-        normalizedAngle > threshold ||
-        v1.length() < this.config.minSegmentLength ||
-        v2.length() < this.config.minSegmentLength
+        angle > threshold ||
+        v1LenSq < minLenSq ||
+        v2LenSq < minLenSq
       ) {
         result.push(current);
       } else {

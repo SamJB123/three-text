@@ -1,38 +1,51 @@
 /// <reference types="@react-three/fiber" />
-import { useEffect, useState, useMemo, useRef, forwardRef } from "react";
-import * as THREE from "three";
-import { Text as ThreeText } from "./index";
-import type { TextOptions, ThreeTextGeometryInfo as TextGeometryInfo } from "./index";
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { Text as ThreeText } from './index';
+import type {
+  TextOptions,
+  ThreeTextGeometryInfo as TextGeometryInfo
+} from './index';
 
 function deepEqual(a: any, b: any): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
   if (typeof a !== 'object' || typeof b !== 'object') return false;
-  
+
+  // Arrays (common in options like color, byCharRange, etc.)
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
-  
+
   if (keysA.length !== keysB.length) return false;
-  
+
   for (const key of keysA) {
-    if (!keysB.includes(key)) return false;
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
     if (!deepEqual(a[key], b[key])) return false;
   }
-  
+
   return true;
 }
 
 function useDeepCompareMemo<T>(value: T): T {
   const ref = useRef<T>(value);
-  
+
   if (!deepEqual(value, ref.current)) {
     ref.current = value;
   }
-  
+
   return ref.current;
 }
 
-export interface ThreeTextProps extends Omit<TextOptions, "text"> {
+export interface ThreeTextProps extends Omit<TextOptions, 'text'> {
   children: string;
   font: string | ArrayBuffer;
   material?: THREE.Material;
@@ -59,17 +72,19 @@ export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
       ...restOptions
     } = props;
 
-    const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
-    const [error, setError] = useState<Error | null>(null);
-
-    const defaultMaterial = useMemo(
-      () =>
-        new THREE.MeshBasicMaterial({
-          color: 0xffffff,
-          side: THREE.DoubleSide,
-        }),
-      []
+    const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(
+      null
     );
+    const [error, setError] = useState<Error | null>(null);
+    const geometryRef = useRef<THREE.BufferGeometry | null>(null);
+
+    const defaultMaterial = useMemo(() => {
+      return new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        vertexColors
+      });
+    }, [vertexColors]);
 
     const finalMaterial = material || defaultMaterial;
 
@@ -87,19 +102,26 @@ export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
           const text = await ThreeText.create({
             text: children,
             font,
-            ...memoizedTextOptions,
+            ...memoizedTextOptions
           });
 
-          if (!cancelled) {
-            setGeometry(text.geometry);
-            if (onLoad) onLoad(text.geometry, text);
+          if (cancelled) {
+            // If a newer render superseded this request, avoid leaking geometry
+            text.geometry.dispose();
+            return;
           }
+
+          // Dispose previous geometry (if any) before swapping
+          geometryRef.current?.dispose();
+          geometryRef.current = text.geometry;
+          setGeometry(text.geometry);
+          if (onLoad) onLoad(text.geometry, text);
         } catch (err) {
           const error = err as Error;
           if (!cancelled) {
             setError(error);
             if (onError) onError(error);
-            else console.error("ThreeText error:", error);
+            else console.error('ThreeText error:', error);
           }
         }
       }
@@ -109,19 +131,22 @@ export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
       return () => {
         cancelled = true;
       };
-    }, [font, children, memoizedTextOptions, onLoad, onError, vertexColors]);
+    }, [font, children, memoizedTextOptions, onLoad, onError]);
 
-    // Handle geometry and material cleanup
+    // Cleanup geometry on unmount
     useEffect(() => {
       return () => {
-        if (geometry) {
-          geometry.dispose();
-        }
-        if (!material && defaultMaterial) {
-          defaultMaterial.dispose();
-        }
+        geometryRef.current?.dispose();
+        geometryRef.current = null;
       };
-    }, [geometry, material, defaultMaterial]);
+    }, []);
+
+    // Cleanup default material when it changes or on unmount
+    useEffect(() => {
+      return () => {
+        defaultMaterial.dispose();
+      };
+    }, [defaultMaterial]);
 
     if (error || !geometry) {
       return null;

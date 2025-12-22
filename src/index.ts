@@ -2,12 +2,8 @@
 export { Text } from './core/Text';
 export { DEFAULT_CURVE_FIDELITY } from './core/geometry/Polygonizer';
 export { FontMetadataExtractor } from './core/font/FontMetadata';
-export { globalGlyphCache } from './core/cache/GlyphCache';
-export type {
-  GlyphCache,
-  GlyphCacheStats,
-  GlyphData
-} from './core/cache/GlyphCache';
+export { globalGlyphCache, createGlyphCache } from './core/cache/sharedCaches';
+export type { CacheStats } from './utils/LRUCache';
 
 export type {
   TextAlign,
@@ -27,8 +23,10 @@ export type {
   FontMetrics,
   ProcessedGeometry,
   Triangles,
+  GlyphData,
   GlyphGeometryInfo,
   TextGeometryInfo,
+  TextHandle,
   TextOptions,
   ColorOptions,
   ColorByRange,
