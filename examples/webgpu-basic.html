@@ -98,7 +98,7 @@
       const width = bounds.max.x - bounds.min.x;
       const height = bounds.max.y - bounds.min.y;
 
-      status.textContent = `Ready: ${bufferSet.vertexCount} triangles`;
+      status.textContent = `Ready: ${bufferSet.indexCount / 3} triangles`;
       status.className = 'status-ready';
 
       // Simple shader that renders with basic lighting
@@ -131,13 +131,12 @@
 
           @fragment
           fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
-            // Light from behind-top-left
-            let lightDir = normalize(vec3<f32>(-0.5, 0.5, -1.0));
+            let lightDir = normalize(vec3<f32>(-0.5, 0.5, 1.0));
             let normal = normalize(input.normal);
             
-            let diffuse = max(dot(normal, lightDir), 0.0);
-            let ambient = 0.5;
-            let lighting = ambient + diffuse * 0.9;
+            let diffuse = abs(dot(normal, lightDir));
+            let ambient = 0.3;
+            let lighting = ambient + diffuse * 0.7;
             
             return vec4<f32>(vec3<f32>(1.0) * lighting, 1.0);
           }
@@ -289,7 +288,7 @@
         renderPass.setBindGroup(0, bindGroup);
         renderPass.setVertexBuffer(0, bufferSet.buffers.vertex);
         renderPass.setIndexBuffer(bufferSet.buffers.indices, bufferSet.indexFormat);
-        renderPass.drawIndexed(bufferSet.vertexCount);
+        renderPass.drawIndexed(bufferSet.indexCount);
         renderPass.end();
 
         device.queue.submit([commandEncoder.finish()]);

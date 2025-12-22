@@ -25,11 +25,12 @@ Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harf
 
 - [Overview](#overview)
 - [Getting started](#getting-started)
+- [Architecture](#architecture)
   - [Three.js](#threejs)
   - [React Three Fiber](#react-three-fiber)
   - [p5.js](#p5js)
+  - [Coordinate systems](#coordinate-systems)
 - [Development and examples](#development-and-examples)
-- [Architecture](#architecture)
 - [Why three-text?](#why-three-text)
 - [Library structure](#library-structure)
 - [Key concepts and methods](#key-concepts-and-methods)
@@ -142,6 +143,13 @@ function draw() {
 
 `createThreeTextGeometry()` accepts all the same options as Three.js (`layout`, `fontVariations`, `depth`, etc.) and returns `{ geometry, planeBounds, glyphs }`. Use `planeBounds` to center the text
 
+### Coordinate systems
+
+The core library uses a right-handed coordinate system with +Y down. Text extrudes from z=0 toward positive Z
+
+**Three.js, WebGL, WebGPU:** Geometry is used as-is. Front cap normals point +Z
+
+**p5.js:** The adapter flips Y coordinates (p5 uses +Y up) but preserves Z. When using `directionalLight(r, g, b, x, y, z)`, note that p5 negates the direction vector internally
 
 ### Setup
 
@@ -322,7 +330,10 @@ For text with tight tracking, connected scripts, or complex kerning pairs, indiv
 
 #### Flat geometry mode
 
-When `depth` is 0, the library generates single-sided geometry with normals pointing toward the camera (positive Z direction), reducing triangles by approximately 50% compared to extruded geometry
+When `depth` is 0, the library generates single-sided geometry, reducing triangles by approximately 50%
+
+- Use `THREE.DoubleSide` for flat text so it remains visible from both sides
+- For extruded text, `THREE.FrontSide` is typical since front and back faces are separate geometry
 
 
 ## Configuration

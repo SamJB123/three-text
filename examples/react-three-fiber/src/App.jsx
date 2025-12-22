@@ -292,7 +292,7 @@ function App() {
     const mode = animationControls.shaderMode;
     const baseConfig = {
       vertexColors: true,
-      side: THREE.DoubleSide,
+      side: textControls.depth === 0 ? THREE.DoubleSide : THREE.FrontSide,
       transparent: true,
       wireframe: animationControls.wireframe,
       defines: { USE_COLOR: "" },
@@ -380,7 +380,7 @@ function App() {
       vertexShader: waveVertexShader,
       fragmentShader: waveFragmentShader,
       vertexColors: true,
-      side: THREE.DoubleSide,
+      side: textControls.depth === 0 ? THREE.DoubleSide : THREE.FrontSide,
       transparent: true,
       defines: {
         USE_COLOR: "",
@@ -389,6 +389,7 @@ function App() {
   }, [
     animationControls.shaderMode,
     animationControls.wireframe,
+    textControls.depth,
     waveControls.waveHeight,
     waveControls.waveFrequency,
     flipControls.flipSpeed,

@@ -15,6 +15,7 @@ export interface WebGPUBufferSet {
     color?: GPUVertexBufferLayout;
   };
   indexCount: number;
+  indexFormat: GPUIndexFormat;
   dispose(): void;
 }
 
@@ -34,12 +35,12 @@ export function createWebGPUBuffers(
     const baseIndex = i * 6;
     const vertIndex = i * 3;
 
-    // Position (NO FLIP - pass through)
+    // Position
     interleavedData[baseIndex] = vertices[vertIndex];
     interleavedData[baseIndex + 1] = vertices[vertIndex + 1];
     interleavedData[baseIndex + 2] = vertices[vertIndex + 2];
 
-    // Normal (NO FLIP - pass through)
+    // Normal
     interleavedData[baseIndex + 3] = normals[vertIndex];
     interleavedData[baseIndex + 4] = normals[vertIndex + 1];
     interleavedData[baseIndex + 5] = normals[vertIndex + 2];
@@ -121,6 +122,7 @@ export function createWebGPUBuffers(
     buffers,
     layout,
     indexCount,
+    indexFormat,
     dispose() {
       vertexBuffer.destroy();
       indexBuffer.destroy();

@@ -130,7 +130,7 @@
         result.geometry.boundingBox.getCenter(center);
         result.geometry.translate(-center.x, -center.y, -center.z);
         
-        const material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+        const material = new THREE.MeshNormalMaterial();
 
         if (textMesh) {
           const oldGeometry = textMesh.geometry;

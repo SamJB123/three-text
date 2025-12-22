@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.16]
+
+### Fixed
+
+- `Extruder`: Corrected cap normals and triangle winding. Extruded geometry now has outward-facing normals that match triangle orientation. Front faces are visible with `THREE.FrontSide` materials without requiring `DoubleSide`
+- `WebGPU` adapter: Return `indexFormat` from `createWebGPUBuffers` (was causing runtime error)
+- Examples and demos: Updated material configuration to use `DoubleSide` for flat text (`depth: 0`) and `FrontSide` for extruded text
+- Examples: Updated lighting directions to match corrected normals
+
+### Notes
+
+- Geometry now follows standard conventions: front-facing triangles are counter-clockwise with outward normals
+- If you wrote custom shaders that manually flip normals, you may want to remove those workarounds
+- p5.js adapter flips Y axis (p5 uses +Y up) but preserves Z. The `directionalLight(r,g,b,x,y,z)` parameters specify light source location, which p5 negates internally to get light ray direction
+
 ## [0.2.15]
 
 ### Fixed

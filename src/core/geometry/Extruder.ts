@@ -18,12 +18,11 @@ export class Extruder {
     const triangleIndices = geometry.triangles.indices;
     const numPoints = points.length / 2;
 
-    // Count side-wall segments (each segment emits 4 vertices + 6 indices)
+    // Count side-wall segments (4 vertices + 6 indices per segment)
     let sideSegments = 0;
     if (depth !== 0) {
       for (const contour of geometry.contours) {
-        // Each contour is a flat [x0,y0,x1,y1,...] array; side walls connect consecutive points
-        // Contours are expected to be closed (last point repeats first), so segments = (nPoints - 1)
+        // Contours are closed (last point repeats first)
         const contourPoints = contour.length / 2;
         if (contourPoints >= 2) sideSegments += contourPoints - 1;
       }
@@ -43,7 +42,7 @@ export class Extruder {
     const indices = new Uint32Array(indexCount);
 
     if (depth === 0) {
-      // Flat faces only
+      // Single-sided flat geometry at z=0
       let vPos = 0;
       for (let i = 0; i < points.length; i += 2) {
         vertices[vPos] = points[i];
@@ -56,6 +55,7 @@ export class Extruder {
         vPos += 3;
       }
 
+      // libtess outputs CCW, use as-is for +Z facing geometry
       for (let i = 0; i < triangleIndices.length; i++) {
         indices[i] = triangleIndices[i];
       }
@@ -63,11 +63,11 @@ export class Extruder {
       return { vertices, normals, indices };
     }
 
-    // Front/back faces
+    // Extruded geometry: front at z=0, back at z=depth
     const minBackOffset = unitsPerEm * 0.000025;
     const backZ = depth <= minBackOffset ? minBackOffset : depth;
 
-    // Fill front vertices/normals (0..numPoints-1)
+    // Cap at z=0, back face
     for (let p = 0, vi = 0; p < points.length; p += 2, vi++) {
       const base = vi * 3;
       vertices[base] = points[p];
@@ -76,10 +76,10 @@ export class Extruder {
 
       normals[base] = 0;
       normals[base + 1] = 0;
-      normals[base + 2] = 1;
+      normals[base + 2] = -1;
     }
 
-    // Fill back vertices/normals (numPoints..2*numPoints-1)
+    // Cap at z=depth, front face
     for (let p = 0, vi = 0; p < points.length; p += 2, vi++) {
       const base = (numPoints + vi) * 3;
       vertices[base] = points[p];
@@ -88,18 +88,18 @@ export class Extruder {
 
       normals[base] = 0;
       normals[base + 1] = 0;
-      normals[base + 2] = -1;
+      normals[base + 2] = 1;
     }
 
-    // Front indices
+    // libtess outputs CCW triangles (viewed from +Z)
+    // Z=0 cap faces -Z, reverse winding
     for (let i = 0; i < triangleIndices.length; i++) {
-      indices[i] = triangleIndices[i];
+      indices[i] = triangleIndices[triangleIndices.length - 1 - i];
     }
 
-    // Back indices (reverse winding + offset)
+    // Z=depth cap faces +Z, use original winding
     for (let i = 0; i < triangleIndices.length; i++) {
-      indices[triangleIndices.length + i] =
-        triangleIndices[triangleIndices.length - 1 - i] + numPoints;
+      indices[triangleIndices.length + i] = triangleIndices[i] + numPoints;
     }
 
     // Side walls
@@ -112,7 +112,7 @@ export class Extruder {
         const p1x = contour[i + 2];
         const p1y = contour[i + 3];
 
-        // Unit normal for the wall quad (per-edge)
+        // Perpendicular normal for this wall segment
         const ex = p1x - p0x;
         const ey = p1y - p0y;
         const lenSq = ex * ex + ey * ey;
@@ -127,7 +127,7 @@ export class Extruder {
         const baseVertex = nextVertex;
         const base = baseVertex * 3;
 
-        // 4 vertices (two at z=0, two at z=depth)
+        // Wall quad: front edge at z=0, back edge at z=depth
         vertices[base] = p0x;
         vertices[base + 1] = p0y;
         vertices[base + 2] = 0;
@@ -144,7 +144,7 @@ export class Extruder {
         vertices[base + 10] = p1y;
         vertices[base + 11] = backZ;
 
-        // Normals (same for all 4 wall vertices)
+        // Wall normals point perpendicular to edge
         normals[base] = nx;
         normals[base + 1] = ny;
         normals[base + 2] = 0;
@@ -161,7 +161,7 @@ export class Extruder {
         normals[base + 10] = ny;
         normals[base + 11] = 0;
 
-        // Indices (two triangles)
+        // Two triangles per wall segment
         indices[idxPos++] = baseVertex;
         indices[idxPos++] = baseVertex + 1;
         indices[idxPos++] = baseVertex + 2;

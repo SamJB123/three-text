@@ -54,7 +54,10 @@
           depth: 0,
         });
 
-        const material = new THREE.MeshStandardMaterial({ color: 0x00aaff });
+        const material = new THREE.MeshStandardMaterial({
+          color: 0x00aaff,
+          side: THREE.DoubleSide
+        });
         const textMesh = new THREE.Mesh(text.geometry, material);
         
         text.geometry.computeBoundingBox();
