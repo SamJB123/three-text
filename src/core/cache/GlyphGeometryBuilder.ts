@@ -242,7 +242,7 @@ export class GlyphGeometryBuilder {
         const forceSeparate = separateGlyphs || clusterHasColoredGlyphs;
 
         // Iterate over the geometric groups identified by BoundaryClusterer
-        // logical groups (words) split into geometric sub-groups (e.g. "aa", "XX", "bb")
+        // logical groups (words) split into geometric sub-groups
         for (const groupIndices of boundaryGroups) {
           const isOverlappingGroup = groupIndices.length > 1;
           const shouldCluster = isOverlappingGroup && !forceSeparate;

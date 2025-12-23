@@ -48,7 +48,9 @@ export class Tessellator {
     }
 
     let extrusionContours: number[][] = needsExtrusionContours
-      ? originalContours ?? this.pathsToContours(paths)
+      ? needsWindingReversal
+        ? tessContours
+        : originalContours ?? this.pathsToContours(paths)
       : [];
 
     if (removeOverlaps) {
@@ -78,28 +80,6 @@ export class Tessellator {
       );
     } else {
       logger.log(`Single-pass triangulation for ${isCFF ? 'CFF' : 'TTF'}`);
-
-      // TTF contours may have inconsistent winding; check if we need normalization
-      if (needsExtrusionContours && !isCFF) {
-        const needsNormalization = this.needsWindingNormalization(extrusionContours);
-        
-        if (needsNormalization) {
-          logger.log('Complex topology detected, running boundary pass for winding normalization');
-          perfLogger.start('Tessellator.windingNormalization', {
-            contourCount: extrusionContours.length
-          });
-          const boundaryResult = this.performTessellation(
-            extrusionContours,
-            'boundary'
-          );
-          perfLogger.end('Tessellator.windingNormalization');
-          if (boundaryResult) {
-            extrusionContours = this.boundaryToContours(boundaryResult);
-          }
-        } else {
-          logger.log('Simple topology, skipping winding normalization');
-        }
-      }
     }
 
     perfLogger.start('Tessellator.triangulationPass', {

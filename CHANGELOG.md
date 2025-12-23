@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.18] - 2025-12-23
+
+### Fixed
+
+- `Extruder`: Side walls now derive from cap boundary edges rather than contour traversal, fixing missing walls in TTF fonts with inconsistent winding (this came up with a Latin/CJK font, I think I got lucky that it wasn't already a problem)
+
 ## [0.2.17] - 2025-12-22
 
 ### Fixed
