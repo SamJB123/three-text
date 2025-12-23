@@ -552,7 +552,7 @@ const text = await Text.create({
 
 Values can be boolean (`true`/`false`) to enable or disable, or numeric for features accepting variant indices. Explicitly disabling a feature overrides the font's defaults
 
-Common tags include [`liga`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#liga) (ligatures), [`kern`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#kern) (kerning), [`calt`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#calt) (contextual alternates), and [`smcp`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#smcp) (small capitals). Number styling uses [`lnum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#lnum)/[`onum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#onum)/[`tnum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#tnum). Stylistic alternates are [`ss01`-`ss20`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#ss01--ss20) and [`cv01`-`cv99`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#cv01--cv99). Feature availability depends on the font
+Common tags include [`liga`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ko#liga) (ligatures),  [`calt`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#calt) (contextual alternates), [`tnum`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#tnum) (tabular numbers), sylistic alternates [`ss01`-`ss20`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_pt#ss01--ss20) and character variants [`cv01`-`cv99`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_ae#cv01--cv99). Feature availability depends on the font
 
 ### Per-glyph attributes
 
@@ -732,6 +732,10 @@ Initializes HarfBuzz WebAssembly. Called automatically by `create()`, but can be
 
 Preloads hyphenation patterns for specified languages. Useful for avoiding async pattern loading during text rendering
 
+##### `Text.setMaxFontCacheMemoryMB(limitMB: number): void`
+
+Sets an upper bound for the font cache, measured by the raw font buffer size, eviction is FIFO by insertion order
+
 #### Instance Methods
 
 The following methods are available on instances created by `Text.create()`:
@@ -749,7 +753,7 @@ Below are the most important configuration interfaces. For a complete list of al
 ```typescript
 interface TextOptions {
   text: string; // Text content to render
-  font?: string | ArrayBuffer; // Font file path or buffer (TTF, OTF, or WOFF)
+  font: string | ArrayBuffer; // Font file path or buffer (TTF, OTF, or WOFF)
   size?: number; // Font size in scene units (default: 72)
   depth?: number; // Extrusion depth (default: 0)
   lineHeight?: number; // Line height multiplier (default: 1.0)

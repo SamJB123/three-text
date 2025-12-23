@@ -1,37 +1,47 @@
 {
   "name": "three-text",
-  "version": "0.2.18",
-  "description": "3D font rendering and text layout engine for the web",
+  "version": "0.2.19",
+  "description": "3D mesh font geometry and text layout engine for the web",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
   "type": "module",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
     "./three": {
+      "types": "./dist/three/index.d.ts",
       "import": "./dist/three/index.js",
       "require": "./dist/three/index.cjs"
     },
     "./three/react": {
+      "types": "./dist/three/react.d.ts",
       "import": "./dist/three/react.js",
       "require": "./dist/three/react.cjs"
     },
     "./webgl": {
+      "types": "./dist/webgl/index.d.ts",
       "import": "./dist/webgl/index.js",
       "require": "./dist/webgl/index.cjs"
     },
     "./webgpu": {
+      "types": "./dist/webgpu/index.d.ts",
       "import": "./dist/webgpu/index.js",
       "require": "./dist/webgpu/index.cjs"
     },
     "./p5": {
+      "types": "./dist/p5/index.d.ts",
       "import": "./dist/p5/index.js",
       "require": "./dist/p5/index.cjs"
     },
-    "./patterns/*": "./dist/patterns/*"
+    "./patterns/*": {
+      "types": "./dist/patterns/*.d.ts",
+      "import": "./dist/patterns/*.js",
+      "require": "./dist/patterns/*.cjs"
+    }
   },
   "files": [
     "dist",
@@ -95,6 +105,7 @@
     "libtess": "^1.2.2"
   },
   "devDependencies": {
+    "@webgpu/types": "^0.1.64",
     "@react-three/fiber": ">=8.0.0",
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",

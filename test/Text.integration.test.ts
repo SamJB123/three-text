@@ -58,5 +58,3 @@ describe('Text integration with real HarfBuzz and font', () => {
     expect(loadedFont?.upem).toBeGreaterThan(0);
   });
 });
-
-

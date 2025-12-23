@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.19] - 2025-12-23
+
+### Fixed
+
+- Subpath imports (e.g., `three-text/three/react`) now resolve correctly in CJS
+- `package.json` exports mapping for `patterns/*` fixed for Node compatibility
+- `TextOptions.font` is now required in types (was already required at runtime)
+- `getCacheStatistics()` return type properly typed
+- `TextGeometryInfo.stats` shape corrected
+- Prettier
+
+### Added
+
+- `@webgpu/types` devDependency
+
 ## [0.2.18] - 2025-12-23
 
 ### Fixed
@@ -91,7 +106,6 @@ Normal direction fixed for depth=0
 
 - Internal benchmark tooling in `bench/` directory
 - Text and background color pickers in all examples (ESM, UMD, React Three Fiber)
-- `Text.clearFontCache()` method to manually clear cached fonts
 - `Text.setMaxFontCacheMemoryMB()` to configure font cache memory limit
 
 ## [0.2.13]

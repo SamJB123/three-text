@@ -36,7 +36,7 @@ vi.mock('../src/core/cache/GlyphContourCollector', () => {
   return {
     GlyphContourCollector: vi.fn(() => {
       const contoursCache = new Map();
-      
+
       return {
         beginGlyph: vi.fn((glyphId: number) => {
           // Store which glyph we're collecting
@@ -85,71 +85,75 @@ vi.mock('../src/core/shaping/HarfBuzzLoader', () => ({
   }
 }));
 
-vi.mock('../src/core/font/FontLoader', () => ({
-  FontLoader: vi.fn(() => ({
-    loadFont: vi.fn().mockResolvedValue({
-      hb: {
-        createBuffer: vi.fn().mockReturnValue({
-          addText: vi.fn(),
-          guessSegmentProperties: vi.fn(),
-          setDirection: vi.fn(),
-          setScript: vi.fn(),
-          setLanguage: vi.fn(),
-          json: vi.fn().mockReturnValue([
-            // Mock glyphs for "three-text, the"
-            { g: 116, cl: 0, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-            { g: 104, cl: 1, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
-            { g: 114, cl: 2, ax: 400, ay: 0, dx: 0, dy: 0 }, // r
-            { g: 101, cl: 3, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
-            { g: 101, cl: 4, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
-            { g: 45, cl: 5, ax: 300, ay: 0, dx: 0, dy: 0 },  // -
-            { g: 116, cl: 6, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-            { g: 101, cl: 7, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
-            { g: 120, cl: 8, ax: 500, ay: 0, dx: 0, dy: 0 }, // x
-            { g: 116, cl: 9, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-            { g: 44, cl: 10, ax: 250, ay: 0, dx: -50, dy: 0 }, // , (with kerning!)
-            { g: 32, cl: 11, ax: 300, ay: 0, dx: 0, dy: 0 }, // space
-            { g: 116, cl: 12, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-            { g: 104, cl: 13, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
-            { g: 101, cl: 14, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
-          ]),
-          destroy: vi.fn()
-        }),
-        shape: vi.fn()
-      },
-      fontBlob: {},
-      face: {},
-      font: {
-        setScale: vi.fn(),
-        setVariations: vi.fn()
-      },
-      module: {
-        addFunction: vi.fn().mockReturnValue(1),
-        removeFunction: vi.fn(),
-        exports: {}
-      },
-      upem: 1000,
-      metrics: {
-        isCFF: false,
-        unitsPerEm: 1000,
-        hheaAscender: 800,
-        hheaDescender: -200,
-        hheaLineGap: 0,
-        typoAscender: 800,
-        typoDescender: -200,
-        typoLineGap: 0,
-        winAscent: 800,
-        winDescent: 200,
-        axisNames: null
-      },
-      fontVariations: {},
-      isVariable: false,
-      variationAxes: {},
-      _buffer: new ArrayBuffer(100)
-    })
-  })),
-  destroyFont: vi.fn()
-}));
+vi.mock('../src/core/font/FontLoader', () => {
+  const FontLoader = Object.assign(
+    vi.fn(() => ({
+      loadFont: vi.fn().mockResolvedValue({
+        hb: {
+          createBuffer: vi.fn().mockReturnValue({
+            addText: vi.fn(),
+            guessSegmentProperties: vi.fn(),
+            setDirection: vi.fn(),
+            setScript: vi.fn(),
+            setLanguage: vi.fn(),
+            json: vi.fn().mockReturnValue([
+              // Mock glyphs for "three-text, the"
+              { g: 116, cl: 0, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+              { g: 104, cl: 1, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
+              { g: 114, cl: 2, ax: 400, ay: 0, dx: 0, dy: 0 }, // r
+              { g: 101, cl: 3, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
+              { g: 101, cl: 4, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
+              { g: 45, cl: 5, ax: 300, ay: 0, dx: 0, dy: 0 }, // -
+              { g: 116, cl: 6, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+              { g: 101, cl: 7, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
+              { g: 120, cl: 8, ax: 500, ay: 0, dx: 0, dy: 0 }, // x
+              { g: 116, cl: 9, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+              { g: 44, cl: 10, ax: 250, ay: 0, dx: -50, dy: 0 }, // , (with kerning!)
+              { g: 32, cl: 11, ax: 300, ay: 0, dx: 0, dy: 0 }, // space
+              { g: 116, cl: 12, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+              { g: 104, cl: 13, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
+              { g: 101, cl: 14, ax: 500, ay: 0, dx: 0, dy: 0 } // e
+            ]),
+            destroy: vi.fn()
+          }),
+          shape: vi.fn()
+        },
+        fontBlob: {},
+        face: {},
+        font: {
+          setScale: vi.fn(),
+          setVariations: vi.fn()
+        },
+        module: {
+          addFunction: vi.fn().mockReturnValue(1),
+          removeFunction: vi.fn(),
+          exports: {}
+        },
+        upem: 1000,
+        metrics: {
+          isCFF: false,
+          unitsPerEm: 1000,
+          hheaAscender: 800,
+          hheaDescender: -200,
+          hheaLineGap: 0,
+          typoAscender: 800,
+          typoDescender: -200,
+          typoLineGap: 0,
+          winAscent: 800,
+          winDescent: 200,
+          axisNames: null
+        },
+        fontVariations: {},
+        isVariable: false,
+        variationAxes: {},
+        _buffer: new ArrayBuffer(100)
+      })
+    })),
+    { destroyFont: vi.fn() }
+  );
+
+  return { FontLoader };
+});
 
 vi.mock('../src/core/shaping/DrawCallbacks', () => ({
   DrawCallbackHandler: vi.fn(() => ({
@@ -177,7 +181,7 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
         // Generate mock glyph infos from clusters
         const glyphInfos: any[] = [];
         let vertexOffset = 0;
-        
+
         if (clustersByLine && clustersByLine.length > 0) {
           clustersByLine.forEach((line: any[]) => {
             line.forEach((cluster: any) => {
@@ -199,7 +203,7 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
             });
           });
         }
-        
+
         return {
           vertices: mockVertices,
           normals: mockNormals,
@@ -236,7 +240,7 @@ vi.mock('../src/core/shaping/TextShaper', () => {
           loadedFont.hb.shape(loadedFont.font, buffer);
           const hbGlyphs = buffer.json(loadedFont.font);
           buffer.destroy();
-          
+
           // Add necessary properties to glyphs
           const glyphs = hbGlyphs.map((glyph: any) => ({
             ...glyph,
@@ -245,13 +249,19 @@ vi.mock('../src/core/shaping/TextShaper', () => {
             x: 0,
             y: 0
           }));
-          
-          return [{
-            text: lineInfo.text,
-            glyphs,
-            position: { x: lineInfo.xOffset || 0, y: -lineIndex * 1000, z: 0 },
-            originalStart: lineInfo.originalStart
-          }];
+
+          return [
+            {
+              text: lineInfo.text,
+              glyphs,
+              position: {
+                x: lineInfo.xOffset || 0,
+                y: -lineIndex * 1000,
+                z: 0
+              },
+              originalStart: lineInfo.originalStart
+            }
+          ];
         });
       })
     }))
@@ -786,21 +796,21 @@ describe('Text Library', () => {
       // Verify we have glyphs
       expect(noColor.glyphs.length).toBeGreaterThan(0);
       expect(withColor.glyphs.length).toBeGreaterThan(0);
-      
+
       const commaGlyphNoColor = noColor.glyphs.find(
         (g) => g.textIndex === commaIndex
       );
       const commaGlyphWithColor = withColor.glyphs.find(
         (g) => g.textIndex === commaIndex
       );
-      
+
       // If mocks don't provide proper glyphs, skip the detailed assertions
       // The test still validates that coloring doesn't crash or break the API
       if (!commaGlyphNoColor || !commaGlyphWithColor) {
         expect(noColor.glyphs.length).toBe(withColor.glyphs.length);
         return;
       }
-      
+
       expect(commaGlyphNoColor).toBeDefined();
       expect(commaGlyphWithColor).toBeDefined();
 

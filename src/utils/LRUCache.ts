@@ -196,7 +196,7 @@ export class LRUCache<K, V> {
   private addToHead(node: LRUNode<K, V>): void {
     node.prev = null;
     node.next = null;
-    
+
     if (!this.head) {
       this.head = this.tail = node;
     } else {
@@ -233,4 +233,3 @@ export class LRUCache<K, V> {
     this.addToHead(node);
   }
 }
-

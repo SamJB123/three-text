@@ -108,14 +108,22 @@ export class FontMetadataExtractor {
 
     try {
       if (gsubTableOffset) {
-        const gsubData = this.extractFeatureDataFromTable(view, gsubTableOffset, nameTableOffset);
-        gsubData.features.forEach(f => features.add(f));
+        const gsubData = this.extractFeatureDataFromTable(
+          view,
+          gsubTableOffset,
+          nameTableOffset
+        );
+        gsubData.features.forEach((f) => features.add(f));
         Object.assign(featureNames, gsubData.names);
       }
 
       if (gposTableOffset) {
-        const gposData = this.extractFeatureDataFromTable(view, gposTableOffset, nameTableOffset);
-        gposData.features.forEach(f => features.add(f));
+        const gposData = this.extractFeatureDataFromTable(
+          view,
+          gposTableOffset,
+          nameTableOffset
+        );
+        gposData.features.forEach((f) => features.add(f));
         Object.assign(featureNames, gposData.names);
       }
     } catch (e) {
@@ -139,7 +147,7 @@ export class FontMetadataExtractor {
     const featureListOffset = view.getUint16(tableOffset + 6);
     const featureListStart = tableOffset + featureListOffset;
     const featureCount = view.getUint16(featureListStart);
-    
+
     const features: string[] = [];
     const names: { [tag: string]: string } = {};
 
@@ -158,24 +166,28 @@ export class FontMetadataExtractor {
       if (/^(ss\d{2}|cv\d{2})$/.test(tag) && nameTableOffset) {
         const featureOffset = view.getUint16(recordOffset + 4);
         const featureTableStart = featureListStart + featureOffset;
-        
+
         // Feature table structure:
         // uint16 FeatureParams offset
         // uint16 LookupCount
         // uint16[LookupCount] LookupListIndex
-        
+
         const featureParamsOffset = view.getUint16(featureTableStart);
-        
+
         // FeatureParams for ss features:
         // uint16 Version (should be 0)
         // uint16 UINameID
         if (featureParamsOffset !== 0) {
           const paramsStart = featureTableStart + featureParamsOffset;
           const version = view.getUint16(paramsStart);
-          
+
           if (version === 0) {
             const nameID = view.getUint16(paramsStart + 2);
-            const name = this.getNameFromNameTable(view, nameTableOffset, nameID);
+            const name = this.getNameFromNameTable(
+              view,
+              nameTableOffset,
+              nameID
+            );
             if (name) {
               names[tag] = name;
             }

@@ -29,7 +29,9 @@ export const globalGlyphCache = new LRUCache<string, GlyphData>({
   calculateSize: calculateGlyphMemoryUsage
 });
 
-export function createGlyphCache(maxCacheSizeMB: number = DEFAULT_CACHE_SIZE_MB): LRUCache<string, GlyphData> {
+export function createGlyphCache(
+  maxCacheSizeMB: number = DEFAULT_CACHE_SIZE_MB
+): LRUCache<string, GlyphData> {
   return new LRUCache<string, GlyphData>({
     maxEntries: Infinity,
     maxMemoryBytes: maxCacheSizeMB * 1024 * 1024,
@@ -61,4 +63,3 @@ export const globalClusteringCache = new LRUCache<
   maxEntries: 2000,
   calculateSize: () => 1
 });
-

@@ -201,7 +201,9 @@ export class DrawCallbackHandler {
 // wasm function pointers when users create many Text instances
 const sharedDrawCallbackHandlers = new WeakMap<object, DrawCallbackHandler>();
 
-export function getSharedDrawCallbackHandler(font: LoadedFont): DrawCallbackHandler {
+export function getSharedDrawCallbackHandler(
+  font: LoadedFont
+): DrawCallbackHandler {
   const key = font.module as unknown as object;
   const existing = sharedDrawCallbackHandlers.get(key);
   if (existing) return existing;

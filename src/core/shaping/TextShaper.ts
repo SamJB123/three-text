@@ -183,19 +183,22 @@ export class TextShaper {
 
         if (isCJKChar && nextIsCJKChar) {
           let shouldApply = true;
-          
+
           if (LineBreak.isCJClosingPunctuation(nextChar)) {
             shouldApply = false;
           }
-          
+
           if (LineBreak.isCJOpeningPunctuation(currentChar)) {
             shouldApply = false;
           }
-          
-          if (LineBreak.isCJPunctuation(currentChar) && LineBreak.isCJPunctuation(nextChar)) {
+
+          if (
+            LineBreak.isCJPunctuation(currentChar) &&
+            LineBreak.isCJPunctuation(nextChar)
+          ) {
             shouldApply = false;
           }
-          
+
           if (shouldApply) {
             cursorX += cjkAdjustment;
           }

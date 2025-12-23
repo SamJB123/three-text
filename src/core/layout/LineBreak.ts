@@ -476,7 +476,7 @@ export class LineBreak {
     let glueWidth: number;
     let glueStretch: number;
     let glueShrink: number;
-    
+
     if (glueParams) {
       glueWidth = glueParams.width;
       glueStretch = glueParams.stretch;
@@ -493,7 +493,9 @@ export class LineBreak {
       const nextChar = i < chars.length - 1 ? chars[i + 1] : null;
 
       if (/\s/.test(char)) {
-        const width = widths ? (widths[i] ?? measureText(char)) : measureText(char);
+        const width = widths
+          ? (widths[i] ?? measureText(char))
+          : measureText(char);
         items.push({
           type: ItemType.GLUE,
           width,
@@ -1025,7 +1027,9 @@ export class LineBreak {
       if (breaks.length === 0) {
         // For first emergency attempt, use initialEmergencyStretch
         // For subsequent iterations (short line detection), progressively increase
-        currentEmergencyStretch = initialEmergencyStretch + (iteration * width * SHORT_LINE_EMERGENCY_STRETCH_INCREMENT);
+        currentEmergencyStretch =
+          initialEmergencyStretch +
+          iteration * width * SHORT_LINE_EMERGENCY_STRETCH_INCREMENT;
         breaks = LineBreak.findBreakpoints(
           currentItems,
           width,
@@ -1069,7 +1073,12 @@ export class LineBreak {
         if (
           shortLineDetectionEnabled &&
           breaks.length > 1 &&
-          LineBreak.hasShortLines(currentItems, breaks, width, shortLineThreshold)
+          LineBreak.hasShortLines(
+            currentItems,
+            breaks,
+            width,
+            shortLineThreshold
+          )
         ) {
           // Retry with more emergency stretch to push words to next line
           iteration++;

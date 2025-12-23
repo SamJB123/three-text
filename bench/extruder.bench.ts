@@ -74,5 +74,3 @@ describe('Extruder performance', () => {
     extruder.extrude(processedRing, 7, unitsPerEm);
   });
 });
-
-

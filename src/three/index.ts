@@ -10,9 +10,11 @@ import { Text as TextCore } from '../core/Text';
 import type {
   TextOptions,
   TextGeometryInfo as CoreTextGeometryInfo,
-  LoadedFont
+  LoadedFont,
+  TextHandle as CoreTextHandle
 } from '../core/types';
 import type { HyphenationTrieNode } from '../hyphenation';
+import type { CacheStats } from '../utils/LRUCache';
 
 // Three.js specific interface that includes BufferGeometry
 export interface ThreeTextGeometryInfo
@@ -23,13 +25,15 @@ export interface ThreeTextGeometryInfo
   geometry: BufferGeometry;
   // Utility methods from core
   getLoadedFont(): LoadedFont | undefined;
-  getCacheStatistics(): any;
+  getCacheStatistics():
+    | (CacheStats & { hitRate: number; memoryUsageMB: number })
+    | null;
   clearCache(): void;
   measureTextWidth(text: string, letterSpacing?: number): number;
   update(options: Partial<TextOptions>): Promise<ThreeTextGeometryInfo>;
 }
 
-function convertToThree(result: any): ThreeTextGeometryInfo {
+function convertToThree(result: CoreTextHandle): ThreeTextGeometryInfo {
   // Create BufferGeometry from raw arrays
   const geometry = new BufferGeometry();
   geometry.setAttribute(
@@ -94,6 +98,7 @@ export class Text {
   static init = TextCore.init;
   static registerPattern = TextCore.registerPattern;
   static preloadPatterns = TextCore.preloadPatterns;
+  static setMaxFontCacheMemoryMB = TextCore.setMaxFontCacheMemoryMB;
 
   // Main API - wraps core result in BufferGeometry
   static async create(options: TextOptions): Promise<ThreeTextGeometryInfo> {

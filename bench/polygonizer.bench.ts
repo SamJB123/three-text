@@ -1,15 +1,30 @@
 import { describe, bench } from 'vitest';
-import { Polygonizer, DEFAULT_CURVE_FIDELITY } from '../src/core/geometry/Polygonizer';
+import {
+  Polygonizer,
+  DEFAULT_CURVE_FIDELITY
+} from '../src/core/geometry/Polygonizer';
 import { Vec2 } from '../src/core/vectors';
 
 describe('Polygonizer performance', () => {
   const polygonizer = new Polygonizer(DEFAULT_CURVE_FIDELITY);
 
   const quadraticCurves = [
-    { start: new Vec2(0, 0), control: new Vec2(50, 100), end: new Vec2(100, 0) },
-    { start: new Vec2(0, 0), control: new Vec2(10, 100), end: new Vec2(100, 0) },
+    {
+      start: new Vec2(0, 0),
+      control: new Vec2(50, 100),
+      end: new Vec2(100, 0)
+    },
+    {
+      start: new Vec2(0, 0),
+      control: new Vec2(10, 100),
+      end: new Vec2(100, 0)
+    },
     { start: new Vec2(0, 0), control: new Vec2(50, 10), end: new Vec2(100, 0) },
-    { start: new Vec2(0, 0), control: new Vec2(500, 1000), end: new Vec2(1000, 0) }
+    {
+      start: new Vec2(0, 0),
+      control: new Vec2(500, 1000),
+      end: new Vec2(1000, 0)
+    }
   ];
 
   const cubicCurves = [
@@ -64,6 +79,3 @@ describe('Polygonizer performance', () => {
     }
   });
 });
-
-
-

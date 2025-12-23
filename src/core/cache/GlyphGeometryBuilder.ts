@@ -19,7 +19,10 @@ import { Tessellator } from '../geometry/Tessellator';
 import { Extruder } from '../geometry/Extruder';
 import { BoundaryClusterer } from '../geometry/BoundaryClusterer';
 import { GlyphContourCollector } from './GlyphContourCollector';
-import { getSharedDrawCallbackHandler, DrawCallbackHandler } from '../shaping/DrawCallbacks';
+import {
+  getSharedDrawCallbackHandler,
+  DrawCallbackHandler
+} from '../shaping/DrawCallbacks';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
 import { HarfBuzzGlyph } from '../types';
 import { LRUCache } from '../../utils/LRUCache';
@@ -51,7 +54,10 @@ export class GlyphGeometryBuilder {
   private loadedFont: LoadedFont;
   private wordCache: LRUCache<string, GlyphData>;
   private contourCache: LRUCache<string, GlyphContours>;
-  private clusteringCache: LRUCache<string, { glyphIds: number[], groups: number[][] }>;
+  private clusteringCache: LRUCache<
+    string,
+    { glyphIds: number[]; groups: number[][] }
+  >;
   private emptyGlyphs: Set<number> = new Set();
 
   constructor(cache: LRUCache<string, GlyphData>, loadedFont: LoadedFont) {
@@ -202,7 +208,7 @@ export class GlyphGeometryBuilder {
           // Key must be font-specific; glyph ids/bounds differ between fonts
           const cacheKey = `${this.cacheKeyPrefix}_${cluster.text}`;
           const cached = this.clusteringCache.get(cacheKey);
-          
+
           let isValid = false;
           if (cached && cached.glyphIds.length === cluster.glyphs.length) {
             isValid = true;
@@ -224,9 +230,9 @@ export class GlyphGeometryBuilder {
               clusterGlyphContours,
               relativePositions
             );
-            
+
             this.clusteringCache.set(cacheKey, {
-              glyphIds: cluster.glyphs.map(g => g.g),
+              glyphIds: cluster.glyphs.map((g) => g.g),
               groups: boundaryGroups
             });
           }
@@ -295,7 +301,12 @@ export class GlyphGeometryBuilder {
             const groupPosX = clusterX + (firstGlyphInGroup.x ?? 0);
             const groupPosY = clusterY + (firstGlyphInGroup.y ?? 0);
             const groupPosZ = clusterZ;
-            const vertexStart = pushTask(cachedCluster, groupPosX, groupPosY, groupPosZ);
+            const vertexStart = pushTask(
+              cachedCluster,
+              groupPosX,
+              groupPosY,
+              groupPosZ
+            );
 
             const clusterVertexCount = cachedCluster.vertices.length / 3;
 
@@ -366,7 +377,12 @@ export class GlyphGeometryBuilder {
                 cachedGlyph.useCount++;
               }
 
-              const vertexStart = pushTask(cachedGlyph, glyphPosX, glyphPosY, glyphPosZ);
+              const vertexStart = pushTask(
+                cachedGlyph,
+                glyphPosX,
+                glyphPosY,
+                glyphPosZ
+              );
 
               const glyphInfo = this.createGlyphInfo(
                 glyph,
@@ -504,7 +520,7 @@ export class GlyphGeometryBuilder {
 
     // Rebind collector before draw operation
     this.drawCallbacks.setCollector(this.collector);
-    
+
     this.collector.reset();
     this.collector.beginGlyph(glyphId, 0);
     this.loadedFont.module.exports.hb_font_draw_glyph(
@@ -539,7 +555,12 @@ export class GlyphGeometryBuilder {
     depth: number,
     isCFF: boolean
   ): GlyphData {
-    const processedGeometry = this.tessellator.process(paths, true, isCFF, depth !== 0);
+    const processedGeometry = this.tessellator.process(
+      paths,
+      true,
+      isCFF,
+      depth !== 0
+    );
     return this.extrudeAndPackage(processedGeometry, depth);
   }
 

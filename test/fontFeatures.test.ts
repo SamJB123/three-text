@@ -50,6 +50,4 @@ describe('fontFeatures utilities', () => {
       expect(result).toBe('liga');
     });
   });
-
 });
-

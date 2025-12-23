@@ -1,4 +1,5 @@
 import type { HyphenationTrieNode } from '../hyphenation';
+import type { CacheStats } from '../utils/LRUCache';
 import type { Vec2, Vec3, BoundingBox } from './vectors';
 export type { HyphenationTrieNode };
 
@@ -90,7 +91,11 @@ export interface HarfBuzzAPI {
   createFace: (blob: HarfBuzzBlob, index: number) => HarfBuzzFace;
   createFont: (face: HarfBuzzFace) => HarfBuzzFont;
   createBuffer: () => HarfBuzzBuffer;
-  shape: (font: HarfBuzzFont, buffer: HarfBuzzBuffer, features?: string) => void;
+  shape: (
+    font: HarfBuzzFont,
+    buffer: HarfBuzzBuffer,
+    features?: string
+  ) => void;
 }
 
 export interface HarfBuzzBlob {
@@ -230,14 +235,16 @@ export interface TextGeometryInfo {
     pointsRemovedByVisvalingam: number;
     pointsRemovedByColinear: number;
     originalPointCount: number;
-  };
+  } & Partial<CacheStats & { hitRate: number; memoryUsageMB: number }>;
   query(options: TextQueryOptions): TextRange[];
   coloredRanges?: ColoredRange[];
 }
 
 export interface TextHandle extends TextGeometryInfo {
   getLoadedFont(): LoadedFont | undefined;
-  getCacheStatistics(): any;
+  getCacheStatistics():
+    | (CacheStats & { hitRate: number; memoryUsageMB: number })
+    | null;
   clearCache(): void;
   measureTextWidth(text: string, letterSpacing?: number): number;
   update(options: Partial<TextOptions>): Promise<TextHandle>;
@@ -270,7 +277,7 @@ export interface ColoredRange {
 
 export interface TextOptions {
   text: string;
-  font?: string | ArrayBuffer;
+  font: string | ArrayBuffer;
   size?: number;
   depth?: number;
   lineHeight?: number;

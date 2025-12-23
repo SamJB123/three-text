@@ -21,53 +21,47 @@ let fontBuffer: ArrayBuffer;
 describe.runIf(process.env.THREE_TEXT_LOG === 'true')(
   'CJK line break perf (batched widths)',
   () => {
-    it(
-      'runs layout and prints LineBreak timings',
-      async () => {
-        const hbWasmPath = require.resolve('../node_modules/harfbuzzjs/hb.wasm');
-        const hbNodeBuffer = fs.readFileSync(hbWasmPath);
-        const hbArrayBuffer = hbNodeBuffer.buffer.slice(
-          hbNodeBuffer.byteOffset,
-          hbNodeBuffer.byteOffset + hbNodeBuffer.byteLength
-        );
-        Text.setHarfBuzzBuffer(hbArrayBuffer);
+    it('runs layout and prints LineBreak timings', async () => {
+      const hbWasmPath = require.resolve('../node_modules/harfbuzzjs/hb.wasm');
+      const hbNodeBuffer = fs.readFileSync(hbWasmPath);
+      const hbArrayBuffer = hbNodeBuffer.buffer.slice(
+        hbNodeBuffer.byteOffset,
+        hbNodeBuffer.byteOffset + hbNodeBuffer.byteLength
+      );
+      Text.setHarfBuzzBuffer(hbArrayBuffer);
 
-        const fontPath = require.resolve('../examples/fonts/NimbusSanL-Reg.woff');
-        const fontNodeBuffer = fs.readFileSync(fontPath);
-        fontBuffer = fontNodeBuffer.buffer.slice(
-          fontNodeBuffer.byteOffset,
-          fontNodeBuffer.byteOffset + fontNodeBuffer.byteLength
-        );
+      const fontPath = require.resolve('../examples/fonts/NimbusSanL-Reg.woff');
+      const fontNodeBuffer = fs.readFileSync(fontPath);
+      fontBuffer = fontNodeBuffer.buffer.slice(
+        fontNodeBuffer.byteOffset,
+        fontNodeBuffer.byteOffset + fontNodeBuffer.byteLength
+      );
 
-        await Text.init();
-        Text.registerPattern('en-us', enUs);
+      await Text.init();
+      Text.registerPattern('en-us', enUs);
 
-        const iterations = 3;
-        const config = {
-          text: CJK_TEXT,
-          font: fontBuffer,
-          size: 72,
-          depth: 0,
-          layout: {
-            width: 600,
-            align: 'justify',
-            direction: 'ltr',
-            hyphenate: false,
-            language: 'en-us'
-          }
-        };
-
-        perfLogger.clear();
-        for (let i = 0; i < iterations; i++) {
-          // eslint-disable-next-line no-await-in-loop
-          await Text.create(config);
+      const iterations = 3;
+      const config = {
+        text: CJK_TEXT,
+        font: fontBuffer,
+        size: 72,
+        depth: 0,
+        layout: {
+          width: 600,
+          align: 'justify',
+          direction: 'ltr',
+          hyphenate: false,
+          language: 'en-us'
         }
+      };
 
-        perfLogger.printSummary();
-      },
-      30000
-    );
+      perfLogger.clear();
+      for (let i = 0; i < iterations; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await Text.create(config);
+      }
+
+      perfLogger.printSummary();
+    }, 30000);
   }
 );
-
-

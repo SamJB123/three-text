@@ -190,13 +190,10 @@ export class PathOptimizer {
 
       const v1LenSq = v1x * v1x + v1y * v1y;
       const v2LenSq = v2x * v2x + v2y * v2y;
-      const minLenSq = this.config.minSegmentLength * this.config.minSegmentLength;
+      const minLenSq =
+        this.config.minSegmentLength * this.config.minSegmentLength;
 
-      if (
-        angle > threshold ||
-        v1LenSq < minLenSq ||
-        v2LenSq < minLenSq
-      ) {
+      if (angle > threshold || v1LenSq < minLenSq || v2LenSq < minLenSq) {
         result.push(current);
       } else {
         this.stats.pointsRemovedByColinear++;

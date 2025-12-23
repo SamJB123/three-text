@@ -137,9 +137,7 @@ export class TextLayout {
     return { offset, adjustedBounds };
   }
 
-  public computeAlignmentOffset(
-    options: AlignmentOptions
-  ): {
+  public computeAlignmentOffset(options: AlignmentOptions): {
     offset: number;
     adjustedBounds: {
       min: { x: number; y: number; z: number };

@@ -27,7 +27,9 @@ export class TextMeasurer {
       buffer.addText(text);
       buffer.guessSegmentProperties();
 
-      const featuresString = convertFontFeaturesToString(loadedFont.fontFeatures);
+      const featuresString = convertFontFeaturesToString(
+        loadedFont.fontFeatures
+      );
       loadedFont.hb.shape(loadedFont.font, buffer, featuresString);
 
       const glyphInfos = buffer.json(loadedFont.font);
@@ -72,7 +74,7 @@ export class TextMeasurer {
     const buffer = loadedFont.hb.createBuffer();
     buffer.addText(text);
     buffer.guessSegmentProperties();
-    
+
     const featuresString = convertFontFeaturesToString(loadedFont.fontFeatures);
     loadedFont.hb.shape(loadedFont.font, buffer, featuresString);
 

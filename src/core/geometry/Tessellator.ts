@@ -23,7 +23,12 @@ export class Tessellator {
       `Tessellator: removeOverlaps=${removeOverlaps}, processing ${valid.length} paths`
     );
 
-    return this.tessellate(valid, removeOverlaps, isCFF, needsExtrusionContours);
+    return this.tessellate(
+      valid,
+      removeOverlaps,
+      isCFF,
+      needsExtrusionContours
+    );
   }
 
   private tessellate(
@@ -50,7 +55,7 @@ export class Tessellator {
     let extrusionContours: number[][] = needsExtrusionContours
       ? needsWindingReversal
         ? tessContours
-        : originalContours ?? this.pathsToContours(paths)
+        : (originalContours ?? this.pathsToContours(paths))
       : [];
 
     if (removeOverlaps) {
@@ -92,7 +97,10 @@ export class Tessellator {
         ? 'libtess returned empty result from triangulation pass'
         : 'libtess returned empty result from single-pass triangulation';
       logger.warn(warning);
-      return { triangles: { vertices: [], indices: [] }, contours: extrusionContours };
+      return {
+        triangles: { vertices: [], indices: [] },
+        contours: extrusionContours
+      };
     }
 
     return {
@@ -104,7 +112,10 @@ export class Tessellator {
     };
   }
 
-  private pathsToContours(paths: Path[], reversePoints: boolean = false): number[][] {
+  private pathsToContours(
+    paths: Path[],
+    reversePoints: boolean = false
+  ): number[][] {
     const contours: number[][] = new Array(paths.length);
 
     for (let p = 0; p < paths.length; p++) {
@@ -280,7 +291,7 @@ export class Tessellator {
   // Returns false if topology is simple enough to skip the expensive pass
   private needsWindingNormalization(contours: number[][]): boolean {
     if (contours.length === 0) return false;
-    
+
     // Heuristic 1: Single contour never needs normalization
     if (contours.length === 1) return false;
 
@@ -290,7 +301,7 @@ export class Tessellator {
     for (const contour of contours) {
       const area = this.signedArea(contour);
       const sign = area >= 0 ? 1 : -1;
-      
+
       if (firstSign === null) {
         firstSign = sign;
       } else if (sign !== firstSign) {
@@ -319,5 +330,4 @@ export class Tessellator {
 
     return area / 2;
   }
-
 }

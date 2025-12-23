@@ -34,51 +34,45 @@ beforeAll(async () => {
 describe.runIf(process.env.THREE_TEXT_LOG === 'true')(
   'Pipeline perf with example text (real HarfBuzz + real font)',
   () => {
-    it(
-      'runs the full pipeline and prints per-stage timings',
-      async () => {
-        const coldIterations = 5;
-        const warmIterations = 5;
+    it('runs the full pipeline and prints per-stage timings', async () => {
+      const coldIterations = 5;
+      const warmIterations = 5;
 
-        const config = {
-          text: EXAMPLE_TEXT,
-          font: fontBuffer,
-          size: 72,
-          depth: 7,
-          lineHeight: 1.33,
-          layout: {
-            width: 1400,
-            align: 'justify',
-            direction: 'ltr',
-            hyphenate: true,
-            language: 'en-us'
-          }
-        };
-
-        // Cold runs – first few passes through the pipeline in this process
-        perfLogger.clear();
-        for (let i = 0; i < coldIterations; i++) {
-          // eslint-disable-next-line no-await-in-loop
-          await Text.create(config);
+      const config = {
+        text: EXAMPLE_TEXT,
+        font: fontBuffer,
+        size: 72,
+        depth: 7,
+        lineHeight: 1.33,
+        layout: {
+          width: 1400,
+          align: 'justify',
+          direction: 'ltr',
+          hyphenate: true,
+          language: 'en-us'
         }
+      };
 
-        console.log('\n=== COLD (first runs in this process) ===');
-        perfLogger.printSummary();
+      // Cold runs – first few passes through the pipeline in this process
+      perfLogger.clear();
+      for (let i = 0; i < coldIterations; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await Text.create(config);
+      }
 
-        // Warm runs – V8 and caches are already hot
-        perfLogger.clear();
+      console.log('\n=== COLD (first runs in this process) ===');
+      perfLogger.printSummary();
 
-        for (let i = 0; i < warmIterations; i++) {
-          // eslint-disable-next-line no-await-in-loop
-          await Text.create(config);
-        }
+      // Warm runs – V8 and caches are already hot
+      perfLogger.clear();
 
-        console.log('\n=== WARM (after V8 optimization and caching) ===');
-        perfLogger.printSummary();
-      },
-      30000
-    );
+      for (let i = 0; i < warmIterations; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await Text.create(config);
+      }
+
+      console.log('\n=== WARM (after V8 optimization and caching) ===');
+      perfLogger.printSummary();
+    }, 30000);
   }
 );
-
-

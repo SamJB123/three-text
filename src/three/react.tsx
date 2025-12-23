@@ -10,6 +10,7 @@ export const Text = Object.assign(TextComponent, {
   init: ThreeTextCore.init,
   registerPattern: ThreeTextCore.registerPattern,
   preloadPatterns: ThreeTextCore.preloadPatterns,
+  setMaxFontCacheMemoryMB: ThreeTextCore.setMaxFontCacheMemoryMB,
   create: ThreeTextCore.create
 });
 

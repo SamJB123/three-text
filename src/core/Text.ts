@@ -49,7 +49,7 @@ export class Text {
   // Stringify with sorted keys for cache stability
   private static stableStringify(obj: { [key: string]: any }): string {
     const keys = Object.keys(obj).sort();
-    const pairs = keys.map(k => `${k}:${obj[k]}`);
+    const pairs = keys.map((k) => `${k}:${obj[k]}`);
     return pairs.join(',');
   }
 
@@ -85,9 +85,7 @@ export class Text {
     return Text.hbInitPromise;
   }
 
-  public static async create(
-    options: TextOptions
-  ): Promise<TextHandle> {
+  public static async create(options: TextOptions): Promise<TextHandle> {
     if (!options.font) {
       throw new Error(
         'Font is required. Specify options.font as a URL string or ArrayBuffer.'
@@ -108,9 +106,7 @@ export class Text {
     const result = await text.createGeometry(options);
 
     // Recursive update function
-    const update = async (
-      newOptions: Partial<TextOptions>
-    ): Promise<any> => {
+    const update = async (newOptions: Partial<TextOptions>): Promise<any> => {
       // Merge options - preserve font from original options if not provided
       const mergedOptions: TextOptions = { ...options };
       for (const key in newOptions) {
@@ -119,7 +115,7 @@ export class Text {
           (mergedOptions as any)[key] = value;
         }
       }
-      
+
       // If font definition or configuration changed, reload font and reset helpers
       if (
         newOptions.font !== undefined ||
@@ -128,7 +124,7 @@ export class Text {
       ) {
         const newLoadedFont = await Text.resolveFont(mergedOptions);
         text.setLoadedFont(newLoadedFont);
-        
+
         // Reset geometry builder and shaper to use new font
         text.resetHelpers();
       }
@@ -232,19 +228,19 @@ export class Text {
       // FNV-1a hash sampling 32 points
       const view = new Uint8Array(buffer);
       let hash = 2166136261;
-      
+
       const samplePoints = Math.min(32, view.length);
       const step = Math.floor(view.length / samplePoints);
-      
+
       for (let i = 0; i < samplePoints; i++) {
         const index = i * step;
         hash ^= view[index];
         hash = Math.imul(hash, 16777619);
       }
-      
+
       hash ^= view.length;
       hash = Math.imul(hash, 16777619);
-      
+
       return (hash >>> 0).toString(36);
     } else {
       return `c${++Text.fontIdCounter}`;
@@ -299,7 +295,7 @@ export class Text {
         fontBuffer,
         fontVariations
       );
-      
+
       if (fontFeatures) {
         this.loadedFont.fontFeatures = fontFeatures;
       }
@@ -388,7 +384,11 @@ export class Text {
       // to selectively use glyph-level caching (separate vertices) only for clusters containing
       // colored text, while non-colored clusters can still use fast cluster-level merging
       let coloredTextIndices: Set<number> | undefined;
-      if (options.color && typeof options.color === 'object' && !Array.isArray(options.color)) {
+      if (
+        options.color &&
+        typeof options.color === 'object' &&
+        !Array.isArray(options.color)
+      ) {
         if (options.color.byText || options.color.byCharRange) {
           // Build the set manually since glyphs don't exist yet
           coloredTextIndices = new Set<number>();
@@ -561,7 +561,9 @@ export class Text {
     const rawDepthInFontUnits = depth * depthScale;
     const minExtrudeDepth = this.loadedFont.upem * 0.000025;
     const depthInFontUnits =
-      rawDepthInFontUnits <= 0 ? 0 : Math.max(rawDepthInFontUnits, minExtrudeDepth);
+      rawDepthInFontUnits <= 0
+        ? 0
+        : Math.max(rawDepthInFontUnits, minExtrudeDepth);
 
     if (!this.textLayout) {
       this.textLayout = new TextLayout(this.loadedFont);
@@ -775,10 +777,12 @@ export class Text {
     for (let i = 0; i < glyphInfoArray.length; i++) {
       const glyphInfo = glyphInfoArray[i];
 
-      glyphInfo.bounds.min.x = glyphInfo.bounds.min.x * finalScale + offsetScaled;
+      glyphInfo.bounds.min.x =
+        glyphInfo.bounds.min.x * finalScale + offsetScaled;
       glyphInfo.bounds.min.y *= finalScale;
       glyphInfo.bounds.min.z *= finalScale;
-      glyphInfo.bounds.max.x = glyphInfo.bounds.max.x * finalScale + offsetScaled;
+      glyphInfo.bounds.max.x =
+        glyphInfo.bounds.max.x * finalScale + offsetScaled;
       glyphInfo.bounds.max.y *= finalScale;
       glyphInfo.bounds.max.z *= finalScale;
     }
@@ -865,14 +869,11 @@ export class Text {
     Text.patternCache.set(language, pattern);
   }
 
-  public static clearFontCache(): void {
-    Text.fontCache.clear();
-    Text.fontCacheMemoryBytes = 0;
-  }
-
   public static setMaxFontCacheMemoryMB(limitMB: number): void {
     Text.maxFontCacheMemoryBytes =
-      limitMB === Infinity ? Infinity : Math.max(1, Math.floor(limitMB)) * 1024 * 1024;
+      limitMB === Infinity
+        ? Infinity
+        : Math.max(1, Math.floor(limitMB)) * 1024 * 1024;
     Text.enforceFontCacheMemoryLimit();
   }
 

@@ -6,7 +6,6 @@ import { readFileSync } from 'fs';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
-import { createFilter } from '@rollup/pluginutils';
 
 // License banner for all builds
 const licenseBanner = `/*!
@@ -25,22 +24,65 @@ const licenseBanner = `/*!
 
 // Public API properties (protected from mangling)
 const reservedProps = [
-  'x', 'y', 'z', 'min', 'max',
+  'x',
+  'y',
+  'z',
+  'min',
+  'max',
   // Three.js compatibility
-  'geometry', 'position', 'rotation', 'scale', 'material',
+  'geometry',
+  'position',
+  'rotation',
+  'scale',
+  'material',
   // Public methods and properties users access
-  'text', 'font', 'width', 'align', 'direction', 'depth', 'tessellator',
-  'vertices', 'normals', 'indices', 'colors', 'glyphAttributes',
-  'lines', 'boundingBox', 'lineHeight', 'naturalWidth',
-  'update', 'create', 'getLoadedFont', 'getCacheStatistics', 'clearCache', 'measureTextWidth',
+  'text',
+  'font',
+  'width',
+  'align',
+  'direction',
+  'depth',
+  'tessellator',
+  'vertices',
+  'normals',
+  'indices',
+  'colors',
+  'glyphAttributes',
+  'lines',
+  'boundingBox',
+  'lineHeight',
+  'naturalWidth',
+  'update',
+  'create',
+  'getLoadedFont',
+  'getCacheStatistics',
+  'clearCache',
+  'measureTextWidth',
   // HarfBuzz API
-  'hb', 'fontBlob', 'faceIndex', 'upem',
+  'hb',
+  'fontBlob',
+  'faceIndex',
+  'upem',
   // Common patterns to preserve
-  'length', 'size', 'name', 'value', 'type', 'data', 'id',
+  'length',
+  'size',
+  'name',
+  'value',
+  'type',
+  'data',
+  'id',
   // Properties accessed dynamically or via string keys
-  'metadata', 'features', 'variations',
+  'metadata',
+  'features',
+  'variations',
   // Public API return properties
-  'planeBounds', 'glyphs', 'buffer', 'path', 'query', 'stats', 'faces'
+  'planeBounds',
+  'glyphs',
+  'buffer',
+  'path',
+  'query',
+  'stats',
+  'faces'
 ];
 
 const terserOptions = {
@@ -292,7 +334,8 @@ const rewriteImports = () => ({
     if (options.format === 'es' || options.format === 'esm') {
       const newCode = code
         .replace(/from ['"]\.\.\/core\/Text['"]/g, "from '../index.js'")
-        .replace(/from ['"]\.\.\/core\/types['"]/g, "from '../index.js'");
+        .replace(/from ['"]\.\.\/core\/types['"]/g, "from '../index.js'")
+        .replace(/from ['"]\.\/index['"]/g, "from './index.js'");
       return { code: newCode, map: null };
     } else if (options.format === 'cjs') {
       const newCode = code
@@ -303,7 +346,8 @@ const rewriteImports = () => ({
         .replace(
           /require\(['"]\.\.\/core\/types['"]\)/g,
           "require('../index.cjs')"
-        );
+        )
+        .replace(/require\(['"]\.\/index['"]\)/g, "require('./index.cjs')");
       return { code: newCode, map: null };
     }
     return null;

@@ -98,8 +98,12 @@ export class TextRangeQuery {
       };
     }
 
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity;
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity;
 
     for (const glyph of glyphs) {
       if (glyph.bounds.min.x < minX) minX = glyph.bounds.min.x;
