@@ -29,7 +29,7 @@ const reservedProps = [
   // Three.js compatibility
   'geometry', 'position', 'rotation', 'scale', 'material',
   // Public methods and properties users access
-  'text', 'font', 'width', 'align', 'direction', 'depth',
+  'text', 'font', 'width', 'align', 'direction', 'depth', 'tessellator',
   'vertices', 'normals', 'indices', 'colors', 'glyphAttributes',
   'lines', 'boundingBox', 'lineHeight', 'naturalWidth',
   'update', 'create', 'getLoadedFont', 'getCacheStatistics', 'clearCache', 'measureTextWidth',
@@ -50,7 +50,18 @@ const terserOptions = {
   compress: {
     passes: 3,
     pure_getters: true,
-    pure_funcs: ['console.log', 'console.warn'],
+    // Strip debug logging and perf instrumentation from minified builds
+    // Keep console.error intact for real failures
+    pure_funcs: [
+      'console.log',
+      'console.warn',
+      'logger.log',
+      'perfLogger.start',
+      'perfLogger.end',
+      'perfLogger.printSummary',
+      'perfLogger.printBaseline',
+      'perfLogger.clear'
+    ],
     drop_console: false,
     drop_debugger: true,
     unsafe: true,

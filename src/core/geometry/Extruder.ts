@@ -67,28 +67,28 @@ export class Extruder {
     const minBackOffset = unitsPerEm * 0.000025;
     const backZ = depth <= minBackOffset ? minBackOffset : depth;
 
-    // Cap at z=0, back face
+    // Generate both caps in one pass
     for (let p = 0, vi = 0; p < points.length; p += 2, vi++) {
-      const base = vi * 3;
-      vertices[base] = points[p];
-      vertices[base + 1] = points[p + 1];
-      vertices[base + 2] = 0;
+      const x = points[p];
+      const y = points[p + 1];
 
-      normals[base] = 0;
-      normals[base + 1] = 0;
-      normals[base + 2] = -1;
-    }
+      // Cap at z=0
+      const base0 = vi * 3;
+      vertices[base0] = x;
+      vertices[base0 + 1] = y;
+      vertices[base0 + 2] = 0;
+      normals[base0] = 0;
+      normals[base0 + 1] = 0;
+      normals[base0 + 2] = -1;
 
-    // Cap at z=depth, front face
-    for (let p = 0, vi = 0; p < points.length; p += 2, vi++) {
-      const base = (numPoints + vi) * 3;
-      vertices[base] = points[p];
-      vertices[base + 1] = points[p + 1];
-      vertices[base + 2] = backZ;
-
-      normals[base] = 0;
-      normals[base + 1] = 0;
-      normals[base + 2] = 1;
+      // Cap at z=depth
+      const baseD = (numPoints + vi) * 3;
+      vertices[baseD] = x;
+      vertices[baseD + 1] = y;
+      vertices[baseD + 2] = backZ;
+      normals[baseD] = 0;
+      normals[baseD + 1] = 0;
+      normals[baseD + 2] = 1;
     }
 
     // libtess outputs CCW triangles (viewed from +Z)

@@ -1,5 +1,6 @@
 import { Vec2, Vec3 } from '../vectors';
 import { perfLogger } from '../../utils/PerformanceLogger';
+import { isLogEnabled } from '../../utils/Logger';
 import {
   Path,
   GlyphGeometryInfo,
@@ -51,6 +52,7 @@ export class GlyphGeometryBuilder {
   private wordCache: LRUCache<string, GlyphData>;
   private contourCache: LRUCache<string, GlyphContours>;
   private clusteringCache: LRUCache<string, { glyphIds: number[], groups: number[][] }>;
+  private emptyGlyphs: Set<number> = new Set();
 
   constructor(cache: LRUCache<string, GlyphData>, loadedFont: LoadedFont) {
     this.cache = cache;
@@ -130,77 +132,48 @@ export class GlyphGeometryBuilder {
     separateGlyphs: boolean = false,
     coloredTextIndices?: Set<number>
   ): InstancedTextGeometry {
-    perfLogger.start('GlyphGeometryBuilder.buildInstancedGeometry', {
-      lineCount: clustersByLine.length,
-      wordCount: clustersByLine.flat().length,
-      depth,
-      removeOverlaps
-    });
+    if (isLogEnabled) {
+      let wordCount = 0;
+      for (let i = 0; i < clustersByLine.length; i++) {
+        wordCount += clustersByLine[i].length;
+      }
+      perfLogger.start('GlyphGeometryBuilder.buildInstancedGeometry', {
+        lineCount: clustersByLine.length,
+        wordCount,
+        depth,
+        removeOverlaps
+      });
+    } else {
+      perfLogger.start('GlyphGeometryBuilder.buildInstancedGeometry');
+    }
 
-    // Growable typed arrays; slice to final size at end
-    let vertexBuffer = new Float32Array(1024);
-    let normalBuffer = new Float32Array(1024);
-    let indexBuffer = new Uint32Array(1024);
-    let vertexPos = 0; // float index (multiple of 3)
-    let normalPos = 0; // float index (multiple of 3)
-    let indexPos = 0; // index count
-
-    const ensureFloatCapacity = (
-      buffer: Float32Array<ArrayBuffer>,
-      needed: number
-    ): Float32Array<ArrayBuffer> => {
-      if (needed <= buffer.length) return buffer;
-      let nextSize = buffer.length;
-      while (nextSize < needed) nextSize *= 2;
-      const next = new Float32Array(nextSize);
-      next.set(buffer);
-      return next;
+    type GeometryTask = {
+      data: GlyphData;
+      px: number;
+      py: number;
+      pz: number;
+      vertexStart: number; // vertex offset (not float offset)
     };
 
-    const ensureIndexCapacity = (
-      buffer: Uint32Array<ArrayBuffer>,
-      needed: number
-    ): Uint32Array<ArrayBuffer> => {
-      if (needed <= buffer.length) return buffer;
-      let nextSize = buffer.length;
-      while (nextSize < needed) nextSize *= 2;
-      const next = new Uint32Array(nextSize);
-      next.set(buffer);
-      return next;
-    };
+    const tasks: GeometryTask[] = [];
+    let totalVertexFloats = 0;
+    let totalNormalFloats = 0;
+    let totalIndexCount = 0;
+    let vertexCursor = 0; // vertex offset (not float offset)
 
-    const appendGeometryToBuffers = (
+    const pushTask = (
       data: GlyphData,
-      position: Vec3,
-      vertexOffset: number
-    ) => {
-      const v = data.vertices;
-      const n = data.normals;
-      const idx = data.indices;
-
-      // Grow buffers as needed
-      vertexBuffer = ensureFloatCapacity(vertexBuffer, vertexPos + v.length);
-      normalBuffer = ensureFloatCapacity(normalBuffer, normalPos + n.length);
-      indexBuffer = ensureIndexCapacity(indexBuffer, indexPos + idx.length);
-
-      // Vertices: translate by position
-      const px = position.x;
-      const py = position.y;
-      const pz = position.z;
-      for (let j = 0; j < v.length; j += 3) {
-        vertexBuffer[vertexPos++] = v[j] + px;
-        vertexBuffer[vertexPos++] = v[j + 1] + py;
-        vertexBuffer[vertexPos++] = v[j + 2] + pz;
-      }
-
-      // Normals: straight copy
-      normalBuffer.set(n, normalPos);
-      normalPos += n.length;
-
-      // Indices: copy with vertex offset
-      for (let j = 0; j < idx.length; j++) {
-        indexBuffer[indexPos++] = idx[j] + vertexOffset;
-      }
+      px: number,
+      py: number,
+      pz: number
+    ): number => {
+      const vertexStart = vertexCursor;
+      tasks.push({ data, px, py, pz, vertexStart });
+      totalVertexFloats += data.vertices.length;
+      totalNormalFloats += data.normals.length;
+      totalIndexCount += data.indices.length;
+      vertexCursor += data.vertices.length / 3;
+      return vertexStart;
     };
     const glyphInfos: GlyphGeometryInfo[] = [];
 
@@ -212,6 +185,10 @@ export class GlyphGeometryBuilder {
     for (let lineIndex = 0; lineIndex < clustersByLine.length; lineIndex++) {
       const line = clustersByLine[lineIndex];
       for (const cluster of line) {
+        const clusterX = cluster.position.x;
+        const clusterY = cluster.position.y;
+        const clusterZ = cluster.position.z;
+
         const clusterGlyphContours: GlyphContours[] = [];
         for (const glyph of cluster.glyphs) {
           clusterGlyphContours.push(this.getContoursForGlyph(glyph.g));
@@ -265,7 +242,7 @@ export class GlyphGeometryBuilder {
         const forceSeparate = separateGlyphs || clusterHasColoredGlyphs;
 
         // Iterate over the geometric groups identified by BoundaryClusterer
-        // logical groups (words) are now split into geometric sub-groups (e.g. "aa", "XX", "bb")
+        // logical groups (words) split into geometric sub-groups (e.g. "aa", "XX", "bb")
         for (const groupIndices of boundaryGroups) {
           const isOverlappingGroup = groupIndices.length > 1;
           const shouldCluster = isOverlappingGroup && !forceSeparate;
@@ -315,14 +292,10 @@ export class GlyphGeometryBuilder {
 
             // (since the cached geometry is relative to that first glyph)
             const firstGlyphInGroup = subClusterGlyphs[0];
-            const groupPosition = new Vec3(
-              cluster.position.x + (firstGlyphInGroup.x ?? 0),
-              cluster.position.y + (firstGlyphInGroup.y ?? 0),
-              cluster.position.z
-            );
-
-            const vertexOffset = vertexPos / 3;
-            appendGeometryToBuffers(cachedCluster, groupPosition, vertexOffset);
+            const groupPosX = clusterX + (firstGlyphInGroup.x ?? 0);
+            const groupPosY = clusterY + (firstGlyphInGroup.y ?? 0);
+            const groupPosZ = clusterZ;
+            const vertexStart = pushTask(cachedCluster, groupPosX, groupPosY, groupPosZ);
 
             const clusterVertexCount = cachedCluster.vertices.length / 3;
 
@@ -331,17 +304,17 @@ export class GlyphGeometryBuilder {
               const glyph = cluster.glyphs[originalIndex];
               const glyphContours = clusterGlyphContours[originalIndex];
 
-              const absoluteGlyphPosition = new Vec3(
-                cluster.position.x + (glyph.x ?? 0),
-                cluster.position.y + (glyph.y ?? 0),
-                cluster.position.z
-              );
+              const glyphPosX = clusterX + (glyph.x ?? 0);
+              const glyphPosY = clusterY + (glyph.y ?? 0);
+              const glyphPosZ = clusterZ;
 
               const glyphInfo = this.createGlyphInfo(
                 glyph,
-                vertexOffset,
+                vertexStart,
                 clusterVertexCount,
-                absoluteGlyphPosition,
+                glyphPosX,
+                glyphPosY,
+                glyphPosZ,
                 glyphContours,
                 depth
               );
@@ -353,11 +326,9 @@ export class GlyphGeometryBuilder {
             for (const i of groupIndices) {
               const glyph = cluster.glyphs[i];
               const glyphContours = clusterGlyphContours[i];
-              const glyphPosition = new Vec3(
-                cluster.position.x + (glyph.x ?? 0),
-                cluster.position.y + (glyph.y ?? 0),
-                cluster.position.z
-              );
+              const glyphPosX = clusterX + (glyph.x ?? 0);
+              const glyphPosY = clusterY + (glyph.y ?? 0);
+              const glyphPosZ = clusterZ;
 
               // Skip glyphs with no paths (spaces, zero-width characters, etc.)
               if (glyphContours.paths.length === 0) {
@@ -365,7 +336,9 @@ export class GlyphGeometryBuilder {
                   glyph,
                   0,
                   0,
-                  glyphPosition,
+                  glyphPosX,
+                  glyphPosY,
+                  glyphPosZ,
                   glyphContours,
                   depth
                 );
@@ -373,9 +346,13 @@ export class GlyphGeometryBuilder {
                 continue;
               }
 
-              let cachedGlyph = this.cache.get(
-                getGlyphCacheKey(this.cacheKeyPrefix, glyph.g, depth, removeOverlaps)
+              const glyphCacheKey = getGlyphCacheKey(
+                this.cacheKeyPrefix,
+                glyph.g,
+                depth,
+                removeOverlaps
               );
+              let cachedGlyph = this.cache.get(glyphCacheKey);
 
               if (!cachedGlyph) {
                 cachedGlyph = this.tessellateGlyph(
@@ -384,22 +361,20 @@ export class GlyphGeometryBuilder {
                   removeOverlaps,
                   isCFF
                 );
-                this.cache.set(
-                  getGlyphCacheKey(this.cacheKeyPrefix, glyph.g, depth, removeOverlaps),
-                  cachedGlyph
-                );
+                this.cache.set(glyphCacheKey, cachedGlyph);
               } else {
                 cachedGlyph.useCount++;
               }
 
-              const vertexOffset = vertexPos / 3;
-              appendGeometryToBuffers(cachedGlyph, glyphPosition, vertexOffset);
+              const vertexStart = pushTask(cachedGlyph, glyphPosX, glyphPosY, glyphPosZ);
 
               const glyphInfo = this.createGlyphInfo(
                 glyph,
-                vertexOffset,
+                vertexStart,
                 cachedGlyph.vertices.length / 3,
-                glyphPosition,
+                glyphPosX,
+                glyphPosY,
+                glyphPosZ,
                 glyphContours,
                 depth
               );
@@ -411,10 +386,39 @@ export class GlyphGeometryBuilder {
       }
     }
 
-    // Slice to used lengths (avoid returning oversized buffers)
-    const vertexArray = vertexBuffer.slice(0, vertexPos);
-    const normalArray = normalBuffer.slice(0, normalPos);
-    const indexArray = indexBuffer.slice(0, indexPos);
+    // Allocate exact-sized buffers and fill once
+    const vertexArray = new Float32Array(totalVertexFloats);
+    const normalArray = new Float32Array(totalNormalFloats);
+    const indexArray = new Uint32Array(totalIndexCount);
+
+    let vertexPos = 0; // float index (multiple of 3)
+    let normalPos = 0; // float index (multiple of 3)
+    let indexPos = 0; // index count
+
+    for (let t = 0; t < tasks.length; t++) {
+      const task = tasks[t];
+      const v = task.data.vertices;
+      const n = task.data.normals;
+      const idx = task.data.indices;
+
+      const px = task.px;
+      const py = task.py;
+      const pz = task.pz;
+
+      for (let j = 0; j < v.length; j += 3) {
+        vertexArray[vertexPos++] = v[j] + px;
+        vertexArray[vertexPos++] = v[j + 1] + py;
+        vertexArray[vertexPos++] = v[j + 2] + pz;
+      }
+
+      normalArray.set(n, normalPos);
+      normalPos += n.length;
+
+      const vertexStart = task.vertexStart;
+      for (let j = 0; j < idx.length; j++) {
+        indexArray[indexPos++] = idx[j] + vertexStart;
+      }
+    }
 
     perfLogger.end('GlyphGeometryBuilder.buildInstancedGeometry');
 
@@ -453,7 +457,9 @@ export class GlyphGeometryBuilder {
     glyph: HarfBuzzGlyph,
     vertexStart: number,
     vertexCount: number,
-    position: Vec3,
+    positionX: number,
+    positionY: number,
+    positionZ: number,
     contours: GlyphContours,
     depth: number
   ): GlyphGeometryInfo {
@@ -464,20 +470,32 @@ export class GlyphGeometryBuilder {
       vertexCount,
       bounds: {
         min: {
-          x: contours.bounds.min.x + position.x,
-          y: contours.bounds.min.y + position.y,
-          z: position.z
+          x: contours.bounds.min.x + positionX,
+          y: contours.bounds.min.y + positionY,
+          z: positionZ
         },
         max: {
-          x: contours.bounds.max.x + position.x,
-          y: contours.bounds.max.y + position.y,
-          z: position.z + depth
+          x: contours.bounds.max.x + positionX,
+          y: contours.bounds.max.y + positionY,
+          z: positionZ + depth
         }
       }
     };
   }
 
   private getContoursForGlyph(glyphId: number): GlyphContours {
+    // Fast path: skip HarfBuzz draw for known-empty glyphs (spaces, zero-width, etc)
+    if (this.emptyGlyphs.has(glyphId)) {
+      return {
+        glyphId,
+        paths: [],
+        bounds: {
+          min: { x: 0, y: 0 },
+          max: { x: 0, y: 0 }
+        }
+      };
+    }
+
     const key = `${this.cacheKeyPrefix}_${glyphId}`;
     const cached = this.contourCache.get(key);
     if (cached) {
@@ -507,6 +525,11 @@ export class GlyphGeometryBuilder {
       }
     };
 
+    // Mark glyph as empty for future fast-path
+    if (contours.paths.length === 0) {
+      this.emptyGlyphs.add(glyphId);
+    }
+
     this.contourCache.set(key, contours);
     return contours;
   }
@@ -516,7 +539,7 @@ export class GlyphGeometryBuilder {
     depth: number,
     isCFF: boolean
   ): GlyphData {
-    const processedGeometry = this.tessellator.process(paths, true, isCFF);
+    const processedGeometry = this.tessellator.process(paths, true, isCFF, depth !== 0);
     return this.extrudeAndPackage(processedGeometry, depth);
   }
 
@@ -581,7 +604,8 @@ export class GlyphGeometryBuilder {
     const processedGeometry = this.tessellator.process(
       glyphContours.paths,
       removeOverlaps,
-      isCFF
+      isCFF,
+      depth !== 0
     );
     perfLogger.end('GlyphGeometryBuilder.tessellateGlyph');
 

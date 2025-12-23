@@ -1018,6 +1018,8 @@ This runs a Node/Vitest scenario that:
 
 Use this to compare changes locally; it is meant as a sanity check on real work rather than a reliable micro-benchmark
 
+Synthetic component benchmarks for tessellation, extrusion, and layout are available in `bench/` and can be run directly with node, e.g. `node bench/benchTessellator.mjs --runs 5`
+
 ## Build system
 
 ### Development

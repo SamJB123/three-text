@@ -7,7 +7,8 @@ export class Tessellator {
   public process(
     paths: Path[],
     removeOverlaps: boolean = true,
-    isCFF: boolean = false
+    isCFF: boolean = false,
+    needsExtrusionContours: boolean = true
   ): ProcessedGeometry {
     if (paths.length === 0) {
       return { triangles: { vertices: [], indices: [] }, contours: [] };
@@ -22,30 +23,44 @@ export class Tessellator {
       `Tessellator: removeOverlaps=${removeOverlaps}, processing ${valid.length} paths`
     );
 
-    return this.tessellate(valid, removeOverlaps, isCFF);
+    return this.tessellate(valid, removeOverlaps, isCFF, needsExtrusionContours);
   }
 
   private tessellate(
     paths: Path[],
     removeOverlaps: boolean,
-    isCFF: boolean
+    isCFF: boolean,
+    needsExtrusionContours: boolean
   ): ProcessedGeometry {
-    // TTF fonts have opposite winding from tessellator expectations
-    const normalizedPaths =
-      !isCFF && !removeOverlaps
-        ? paths.map((p) => this.reverseWinding(p))
-        : paths;
+    // libtess expects CCW winding; TTF outer contours are CW
+    const needsWindingReversal = !isCFF && !removeOverlaps;
+    let originalContours: number[][] | undefined;
+    let tessContours: number[][];
 
-    let contours = this.pathsToContours(normalizedPaths);
+    if (needsWindingReversal) {
+      tessContours = this.pathsToContours(paths, true);
+      if (removeOverlaps || needsExtrusionContours) {
+        originalContours = this.pathsToContours(paths);
+      }
+    } else {
+      originalContours = this.pathsToContours(paths);
+      tessContours = originalContours;
+    }
+
+    let extrusionContours: number[][] = needsExtrusionContours
+      ? originalContours ?? this.pathsToContours(paths)
+      : [];
 
     if (removeOverlaps) {
       logger.log('Two-pass: boundary extraction then triangulation');
 
-      // Extract boundaries to remove overlaps
       perfLogger.start('Tessellator.boundaryPass', {
-        contourCount: contours.length
+        contourCount: tessContours.length
       });
-      const boundaryResult = this.performTessellation(contours, 'boundary');
+      const boundaryResult = this.performTessellation(
+        originalContours!,
+        'boundary'
+      );
       perfLogger.end('Tessellator.boundaryPass');
 
       if (!boundaryResult) {
@@ -53,27 +68,51 @@ export class Tessellator {
         return { triangles: { vertices: [], indices: [] }, contours: [] };
       }
 
-      // Convert boundary elements back to contours
-      contours = this.boundaryToContours(boundaryResult);
+      // Boundary pass normalizes winding (outer CCW, holes CW)
+      tessContours = this.boundaryToContours(boundaryResult);
+      if (needsExtrusionContours) {
+        extrusionContours = tessContours;
+      }
       logger.log(
-        `Boundary pass created ${contours.length} contours. Starting triangulation pass.`
+        `Boundary pass created ${tessContours.length} contours. Starting triangulation pass.`
       );
     } else {
       logger.log(`Single-pass triangulation for ${isCFF ? 'CFF' : 'TTF'}`);
+
+      // TTF contours may have inconsistent winding; check if we need normalization
+      if (needsExtrusionContours && !isCFF) {
+        const needsNormalization = this.needsWindingNormalization(extrusionContours);
+        
+        if (needsNormalization) {
+          logger.log('Complex topology detected, running boundary pass for winding normalization');
+          perfLogger.start('Tessellator.windingNormalization', {
+            contourCount: extrusionContours.length
+          });
+          const boundaryResult = this.performTessellation(
+            extrusionContours,
+            'boundary'
+          );
+          perfLogger.end('Tessellator.windingNormalization');
+          if (boundaryResult) {
+            extrusionContours = this.boundaryToContours(boundaryResult);
+          }
+        } else {
+          logger.log('Simple topology, skipping winding normalization');
+        }
+      }
     }
 
-    // Triangulate the contours
     perfLogger.start('Tessellator.triangulationPass', {
-      contourCount: contours.length
+      contourCount: tessContours.length
     });
-    const triangleResult = this.performTessellation(contours, 'triangles');
+    const triangleResult = this.performTessellation(tessContours, 'triangles');
     perfLogger.end('Tessellator.triangulationPass');
     if (!triangleResult) {
       const warning = removeOverlaps
         ? 'libtess returned empty result from triangulation pass'
         : 'libtess returned empty result from single-pass triangulation';
       logger.warn(warning);
-      return { triangles: { vertices: [], indices: [] }, contours };
+      return { triangles: { vertices: [], indices: [] }, contours: extrusionContours };
     }
 
     return {
@@ -81,18 +120,53 @@ export class Tessellator {
         vertices: triangleResult.vertices,
         indices: triangleResult.indices || []
       },
-      contours
+      contours: extrusionContours
     };
   }
 
-  private pathsToContours(paths: Path[]): number[][] {
-    return paths.map((path) => {
-      const contour: number[] = [];
-      for (const point of path.points) {
-        contour.push(point.x, point.y);
+  private pathsToContours(paths: Path[], reversePoints: boolean = false): number[][] {
+    const contours: number[][] = new Array(paths.length);
+
+    for (let p = 0; p < paths.length; p++) {
+      const points = paths[p].points;
+      const pointCount = points.length;
+
+      // Clipper-style paths can be explicitly closed by repeating the first point at the end
+      // Normalize to a single closing vertex for stable side wall generation
+      const isClosed =
+        pointCount > 1 &&
+        points[0].x === points[pointCount - 1].x &&
+        points[0].y === points[pointCount - 1].y;
+      const end = isClosed ? pointCount - 1 : pointCount;
+
+      // +1 to append a closing vertex
+      const contour = new Array((end + 1) * 2);
+      let i = 0;
+
+      if (reversePoints) {
+        for (let k = end - 1; k >= 0; k--) {
+          const pt = points[k];
+          contour[i++] = pt.x;
+          contour[i++] = pt.y;
+        }
+      } else {
+        for (let k = 0; k < end; k++) {
+          const pt = points[k];
+          contour[i++] = pt.x;
+          contour[i++] = pt.y;
+        }
       }
-      return contour;
-    });
+
+      // Some glyphs omit closePath, leaving gaps in extruded side walls
+      if (i >= 2) {
+        contour[i++] = contour[0];
+        contour[i++] = contour[1];
+      }
+
+      contours[p] = contour;
+    }
+
+    return contours;
   }
 
   private performTessellation(
@@ -105,7 +179,6 @@ export class Tessellator {
   } | null {
     const tess = new libtess.GluTesselator();
 
-    // Set winding rule to NON-ZERO
     tess.gluTessProperty(
       libtess.gluEnum.GLU_TESS_WINDING_RULE,
       libtess.windingRule.GLU_TESS_WINDING_NONZERO
@@ -141,7 +214,7 @@ export class Tessellator {
 
       tess.gluTessCallback(libtess.gluEnum.GLU_TESS_END, () => {
         if (currentContour.length > 0) {
-          contourIndices.push([...currentContour]);
+          contourIndices.push(currentContour);
         }
       });
     }
@@ -209,7 +282,6 @@ export class Tessellator {
         );
       }
 
-      // Ensure contour is closed for side wall generation
       if (contour.length > 2) {
         if (
           contour[0] !== contour[contour.length - 2] ||
@@ -224,10 +296,48 @@ export class Tessellator {
     return contours;
   }
 
-  private reverseWinding(path: Path): Path {
-    return {
-      ...path,
-      points: [...path.points].reverse()
-    };
+  // Check if contours need winding normalization via boundary pass
+  // Returns false if topology is simple enough to skip the expensive pass
+  private needsWindingNormalization(contours: number[][]): boolean {
+    if (contours.length === 0) return false;
+    
+    // Heuristic 1: Single contour never needs normalization
+    if (contours.length === 1) return false;
+
+    // Heuristic 2: All same winding = all outers, no holes
+    // Compute signed areas
+    let firstSign: number | null = null;
+    for (const contour of contours) {
+      const area = this.signedArea(contour);
+      const sign = area >= 0 ? 1 : -1;
+      
+      if (firstSign === null) {
+        firstSign = sign;
+      } else if (sign !== firstSign) {
+        // Mixed winding detected → might have holes or complex topology
+        return true;
+      }
+    }
+
+    // All same winding → simple topology, no normalization needed
+    return false;
   }
+
+  // Compute signed area (CCW = positive, CW = negative)
+  private signedArea(contour: number[]): number {
+    let area = 0;
+    const len = contour.length;
+    if (len < 6) return 0; // Need at least 3 points
+
+    for (let i = 0; i < len; i += 2) {
+      const x1 = contour[i];
+      const y1 = contour[i + 1];
+      const x2 = contour[(i + 2) % len];
+      const y2 = contour[(i + 3) % len];
+      area += x1 * y2 - x2 * y1;
+    }
+
+    return area / 2;
+  }
+
 }

@@ -79,7 +79,7 @@ export class GlyphContourCollector {
     if (this.currentGlyphPaths.length > 0) {
       this.collectedGlyphs.push({
         glyphId: this.currentGlyphId,
-        paths: [...this.currentGlyphPaths],
+        paths: this.currentGlyphPaths,
         bounds: {
           min: {
             x: this.currentGlyphBounds.min.x,
@@ -144,12 +144,10 @@ export class GlyphContourCollector {
       end
     );
 
-    for (const point of flattenedPoints) {
-      this.updateBounds(point);
-    }
-
     for (let i = 0; i < flattenedPoints.length; i++) {
-      this.currentPath.points.push(flattenedPoints[i]);
+      const pt = flattenedPoints[i];
+      this.updateBounds(pt);
+      this.currentPath.points.push(pt);
     }
     this.currentPoint = end;
   }
@@ -186,12 +184,10 @@ export class GlyphContourCollector {
       end
     );
 
-    for (const point of flattenedPoints) {
-      this.updateBounds(point);
-    }
-
     for (let i = 0; i < flattenedPoints.length; i++) {
-      this.currentPath.points.push(flattenedPoints[i]);
+      const pt = flattenedPoints[i];
+      this.updateBounds(pt);
+      this.currentPath.points.push(pt);
     }
     this.currentPoint = end;
   }

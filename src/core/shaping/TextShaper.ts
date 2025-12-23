@@ -99,9 +99,12 @@ export class TextShaper {
     const clusters: GlyphCluster[] = [];
     let currentClusterGlyphs: HarfBuzzGlyph[] = [];
     let currentClusterText = '';
-    let clusterStartPosition = new Vec3();
+    let clusterStartX = 0;
+    let clusterStartY = 0;
 
-    let cursor = new Vec3(lineInfo.xOffset, -lineIndex * scaledLineHeight, 0);
+    let cursorX = lineInfo.xOffset;
+    let cursorY = -lineIndex * scaledLineHeight;
+    const cursorZ = 0;
     // Apply letter spacing after each glyph to match width measurements used during line breaking
     const letterSpacingFU = letterSpacing * this.loadedFont.upem;
 
@@ -137,36 +140,36 @@ export class TextShaper {
           clusters.push({
             text: currentClusterText,
             glyphs: currentClusterGlyphs,
-            position: clusterStartPosition.clone()
+            position: new Vec3(clusterStartX, clusterStartY, cursorZ)
           });
           currentClusterGlyphs = [];
           currentClusterText = '';
         }
       }
 
-      const absoluteGlyphPosition = cursor
-        .clone()
-        .add(new Vec3(glyph.dx, glyph.dy, 0));
+      const absoluteGlyphX = cursorX + glyph.dx;
+      const absoluteGlyphY = cursorY + glyph.dy;
 
       if (!isWhitespace) {
         if (currentClusterGlyphs.length === 0) {
-          clusterStartPosition.copy(absoluteGlyphPosition);
+          clusterStartX = absoluteGlyphX;
+          clusterStartY = absoluteGlyphY;
         }
-        glyph.x = absoluteGlyphPosition.x - clusterStartPosition.x;
-        glyph.y = absoluteGlyphPosition.y - clusterStartPosition.y;
+        glyph.x = absoluteGlyphX - clusterStartX;
+        glyph.y = absoluteGlyphY - clusterStartY;
         currentClusterGlyphs.push(glyph);
         currentClusterText += lineInfo.text[glyph.cl];
       }
 
-      cursor.x += glyph.ax;
-      cursor.y += glyph.ay;
+      cursorX += glyph.ax;
+      cursorY += glyph.ay;
 
       if (letterSpacingFU !== 0 && i < glyphInfos.length - 1) {
-        cursor.x += letterSpacingFU;
+        cursorX += letterSpacingFU;
       }
 
       if (isWhitespace) {
-        cursor.x += spaceAdjustment;
+        cursorX += spaceAdjustment;
       }
 
       // CJK glue adjustment (must match exactly where LineBreak adds glue)
@@ -194,7 +197,7 @@ export class TextShaper {
           }
           
           if (shouldApply) {
-            cursor.x += cjkAdjustment;
+            cursorX += cjkAdjustment;
           }
         }
       }
@@ -204,7 +207,7 @@ export class TextShaper {
       clusters.push({
         text: currentClusterText,
         glyphs: currentClusterGlyphs,
-        position: clusterStartPosition.clone()
+        position: new Vec3(clusterStartX, clusterStartY, cursorZ)
       });
     }
 

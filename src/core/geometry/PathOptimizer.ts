@@ -52,27 +52,31 @@ export class PathOptimizer {
 
     this.stats.originalPointCount += path.points.length;
 
-    let points = [...path.points];
-
+    // Most paths are already immutable after collection; avoid copying large point arrays
+    // The optimizers below never mutate the input `points` array
+    const points = path.points;
     if (points.length < 5) {
       return path;
     }
 
-    points = this.simplifyPathVW(points, this.config.areaThreshold);
+    let optimized = this.simplifyPathVW(points, this.config.areaThreshold);
 
-    if (points.length < 3) {
+    if (optimized.length < 3) {
       return path;
     }
 
-    points = this.removeColinearPoints(points, this.config.colinearThreshold);
+    optimized = this.removeColinearPoints(
+      optimized,
+      this.config.colinearThreshold
+    );
 
-    if (points.length < 3) {
+    if (optimized.length < 3) {
       return path;
     }
 
     return {
       ...path,
-      points
+      points: optimized
     };
   }
 

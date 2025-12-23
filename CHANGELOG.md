@@ -1,10 +1,32 @@
 # Changelog
 
-## [0.2.16]
+## [0.2.17] - 2025-12-22
 
 ### Fixed
 
-- `Extruder`: Corrected cap normals and triangle winding. Extruded geometry now has outward-facing normals that match triangle orientation. Front faces are visible with `THREE.FrontSide` materials without requiring `DoubleSide`
+- `Text`: `maxCacheSizeMB` now correctly configures the per-instance glyph cache size (was previously being dropped before geometry creation)
+- `Tessellator`: Fixed extrusion side walls on complex TTF glyphs (e.g., Chinese characters) by normalizing contour winding before extrusion
+- `Extruder`: Merge front and back cap vertex generation into single loop
+
+### Performance
+
+- `TextMeasurer`: Added batched width measurement for CJK text to reduce HarfBuzz shaping calls from N to 1 per segment
+- `GlyphGeometryBuilder`: Two-pass approach (plan then allocate/fill) replaces dynamic array resizing
+- `TextShaper`: Replaced `Vec3` allocations with direct number variables in per-glyph hot loop
+- `GlyphGeometryBuilder`: Removed `Vec3` allocations in `createGlyphInfo` calls
+- `fontFeatures`: Memoized feature string conversion to avoid repeated object-to-string transformations
+- `PathOptimizer` and `GlyphContourCollector`: Removed unnecessary array copies in path processing
+- `LineBreak`: Lazy computation of CJK glue parameters to avoid unnecessary measurement calls for non-CJK text
+
+### Added
+
+- Individual benchmark scripts for tessellator, extruder, and text layout components in `bench/` directory
+
+## [0.2.16] - 2025-12-22
+
+### Fixed
+
+- `Extruder`: Corrected cap normals and triangle winding. Extruded geometry now has outward-facing normals that match triangle orientation
 - `WebGPU` adapter: Return `indexFormat` from `createWebGPUBuffers` (was causing runtime error)
 - Examples and demos: Updated material configuration to use `DoubleSide` for flat text (`depth: 0`) and `FrontSide` for extruded text
 - Examples: Updated lighting directions to match corrected normals
@@ -15,13 +37,13 @@
 - If you wrote custom shaders that manually flip normals, you may want to remove those workarounds
 - p5.js adapter flips Y axis (p5 uses +Y up) but preserves Z. The `directionalLight(r,g,b,x,y,z)` parameters specify light source location, which p5 negates internally to get light ray direction
 
-## [0.2.15]
+## [0.2.15] - 2025-12-21
 
 ### Fixed
 
 Normal direction fixed for depth=0
 
-## [0.2.14]
+## [0.2.14] - 2025-12-21
 
 ### Fixed
 

@@ -77,7 +77,7 @@ interface BreakNode {
   activeListIndex?: number; // position in active list
 }
 
-// ActiveNodeList maintains all currently viable breakpoints as we scan through the text.
+// ActiveNodeList maintains all currently viable breakpoints as we scan through the text
 // Each node represents a potential break with accumulated demerits (total "cost" from start)
 //
 // Demerits = cumulative penalty score from text start to this break, calculated as:
@@ -159,6 +159,8 @@ export interface LineBreakOptions {
   hyphenate?: boolean;
   language?: string;
   measureText: (text: string) => number;
+  // Optional batched measurement aligned with Array.from(text)
+  measureTextWidths?: (text: string) => number[];
   respectExistingBreaks?: boolean;
   hyphenationPatterns?: HyphenationPatternsMap;
   unitsPerEm?: number;
@@ -195,12 +197,12 @@ export interface LineBreakOptions {
 
   // Disable automatic detection and prevention of short lines
   // When enabled (default), iteratively applies emergency stretch to eliminate
-  // lines that are less than 50% of the target width.
+  // lines that are less than 50% of the target width
   disableShortLineDetection?: boolean;
 
   // Threshold for short line detection (0.0 to 1.0, default: 0.5)
   // Lines with width less than this ratio of the target width are considered problematic
-  // and will trigger additional emergency stretch to push words to the next line.
+  // and will trigger additional emergency stretch to push words to the next line
   shortLineThreshold?: number;
 }
 
@@ -212,7 +214,7 @@ interface LineBreakContext {
   exHyphenPenalty: number;
   currentAlign: TextAlign;
   unitsPerEm?: number;
-  // Letter spacing in font units. Used to correct trailing spacing at line ends.
+  // Letter spacing in font units used to correct trailing spacing at line ends
   letterSpacingFU?: number;
 }
 
@@ -318,6 +320,7 @@ export class LineBreak {
   public static itemizeText(
     text: string,
     measureText: (text: string) => number, // function to measure text width
+    measureTextWidths: ((text: string) => number[]) | undefined,
     hyphenate: boolean = false,
     language: string = 'en-us',
     availablePatterns?: HyphenationPatternsMap,
@@ -331,6 +334,7 @@ export class LineBreak {
       ...this.itemizeParagraph(
         text,
         measureText,
+        measureTextWidths,
         hyphenate,
         language,
         availablePatterns,
@@ -458,12 +462,14 @@ export class LineBreak {
   private static itemizeCJKText(
     text: string,
     measureText: (text: string) => number,
+    measureTextWidths: ((text: string) => number[]) | undefined,
     context: LineBreakContext | undefined,
     startOffset: number = 0,
     glueParams?: { width: number; stretch: number; shrink: number }
   ): Item[] {
     const items: Item[] = [];
     const chars = Array.from(text);
+    const widths = measureTextWidths ? measureTextWidths(text) : null;
     let textPosition = startOffset;
 
     // Inter-character glue parameters
@@ -487,7 +493,7 @@ export class LineBreak {
       const nextChar = i < chars.length - 1 ? chars[i + 1] : null;
 
       if (/\s/.test(char)) {
-        const width = measureText(char);
+        const width = widths ? (widths[i] ?? measureText(char)) : measureText(char);
         items.push({
           type: ItemType.GLUE,
           width,
@@ -502,7 +508,7 @@ export class LineBreak {
 
       items.push({
         type: ItemType.BOX,
-        width: measureText(char),
+        width: widths ? (widths[i] ?? measureText(char)) : measureText(char),
         text: char,
         originIndex: textPosition
       } as Box);
@@ -545,6 +551,7 @@ export class LineBreak {
   private static itemizeParagraph(
     text: string,
     measureText: (text: string) => number,
+    measureTextWidths: ((text: string) => number[]) | undefined,
     hyphenate: boolean,
     language: string,
     availablePatterns: HyphenationPatternsMap | undefined,
@@ -555,12 +562,20 @@ export class LineBreak {
     const items: Item[] = [];
     const chars = Array.from(text);
 
-    // Calculate CJK glue parameters once for consistency across all segments
-    const baseCharWidth = measureText('字');
-    const cjkGlueParams = {
-      width: 0,
-      stretch: baseCharWidth * 0.04,
-      shrink: baseCharWidth * 0.04
+    // Calculate CJK glue parameters lazily and once for consistency across all segments
+    let cjkGlueParams:
+      | { width: number; stretch: number; shrink: number }
+      | undefined;
+    const getCjkGlueParams = () => {
+      if (!cjkGlueParams) {
+        const baseCharWidth = measureText('字');
+        cjkGlueParams = {
+          width: 0,
+          stretch: baseCharWidth * 0.04,
+          shrink: baseCharWidth * 0.04
+        };
+      }
+      return cjkGlueParams;
     };
 
     let buffer = '';
@@ -575,9 +590,10 @@ export class LineBreak {
         const cjkItems = this.itemizeCJKText(
           buffer,
           measureText,
+          measureTextWidths,
           context,
           bufferStart,
-          cjkGlueParams
+          getCjkGlueParams()
         );
         items.push(...cjkItems);
       } else {
@@ -825,6 +841,7 @@ export class LineBreak {
       language = 'en-us',
       respectExistingBreaks = true,
       measureText,
+      measureTextWidths,
       hyphenationPatterns,
       unitsPerEm,
       letterSpacing = 0,
@@ -916,9 +933,9 @@ export class LineBreak {
       exHyphenPenalty: exhyphenpenalty,
       currentAlign: align,
       unitsPerEm,
-      // measureText() includes trailing letter spacing after the final glyph of a token.
+      // measureText() includes trailing letter spacing after the final glyph of a token
       // Shaping applies letter spacing only between glyphs, so we subtract one
-      // trailing letterSpacingFU per line segment (see computeAdjustmentRatio/createLines).
+      // trailing letterSpacingFU per line segment (see computeAdjustmentRatio/createLines)
       letterSpacingFU: unitsPerEm ? letterSpacing * unitsPerEm : 0
     };
 
@@ -942,6 +959,7 @@ export class LineBreak {
     const allItems = LineBreak.itemizeText(
       text,
       measureText,
+      measureTextWidths,
       false,
       language,
       hyphenationPatterns,
@@ -983,6 +1001,7 @@ export class LineBreak {
         const itemsWithHyphenation = LineBreak.itemizeText(
           text,
           measureText,
+          measureTextWidths,
           true,
           language,
           hyphenationPatterns,
@@ -1495,9 +1514,9 @@ export class LineBreak {
           : (items[lineEnd] as Discretionary).preBreakWidth;
     }
 
-    // Correct for trailing letter spacing at the end of the line segment.
+    // Correct for trailing letter spacing at the end of the line segment
     // Our token measurement includes letter spacing after the final glyph;
-    // shaping does not add letter spacing after the final glyph in a line.
+    // shaping does not add letter spacing after the final glyph in a line
     if (context?.letterSpacingFU && totalWidth !== 0) {
       totalWidth -= context.letterSpacingFU;
     }
@@ -1711,7 +1730,7 @@ export class LineBreak {
 
       const lineText = lineTextParts.join('');
 
-      // Correct for trailing letter spacing at the end of the line.
+      // Correct for trailing letter spacing at the end of the line
       if (context?.letterSpacingFU && naturalWidth !== 0) {
         naturalWidth -= context.letterSpacingFU;
       }
@@ -1790,7 +1809,7 @@ export class LineBreak {
 
       const finalLineText = finalLineTextParts.join('');
 
-      // Correct for trailing letter spacing at the end of the final line.
+      // Correct for trailing letter spacing at the end of the final line
       if (context?.letterSpacingFU && finalNaturalWidth !== 0) {
         finalNaturalWidth -= context.letterSpacingFU;
       }

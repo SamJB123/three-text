@@ -104,9 +104,8 @@ export class Text {
     const text = new Text();
     text.setLoadedFont(loadedFont);
 
-    // Initial creation
-    const { font, maxCacheSizeMB, ...geometryOptions } = options;
-    const result = await text.createGeometry(geometryOptions);
+    // Pass full options so createGeometry honors maxCacheSizeMB etc
+    const result = await text.createGeometry(options);
 
     // Recursive update function
     const update = async (
@@ -137,8 +136,7 @@ export class Text {
       // Update closure options for next time
       options = mergedOptions;
 
-      const { font, maxCacheSizeMB, ...currentGeometryOptions } = options;
-      const newResult = await text.createGeometry(currentGeometryOptions);
+      const newResult = await text.createGeometry(options);
 
       return {
         ...newResult,
@@ -740,7 +738,7 @@ export class Text {
       this.textLayout = new TextLayout(this.loadedFont!);
     }
 
-    const alignmentResult = this.textLayout.applyAlignment(vertices, {
+    const alignmentResult = this.textLayout.computeAlignmentOffset({
       width,
       align,
       planeBounds
@@ -752,9 +750,19 @@ export class Text {
 
     const finalScale = size / this.loadedFont!.upem;
 
+    const offsetScaled = offset * finalScale;
+
     // Scale vertices only (normals are unit vectors, don't scale)
-    for (let i = 0; i < vertices.length; i++) {
-      vertices[i] *= finalScale;
+    if (offsetScaled === 0) {
+      for (let i = 0; i < vertices.length; i++) {
+        vertices[i] *= finalScale;
+      }
+    } else {
+      for (let i = 0; i < vertices.length; i += 3) {
+        vertices[i] = vertices[i] * finalScale + offsetScaled;
+        vertices[i + 1] *= finalScale;
+        vertices[i + 2] *= finalScale;
+      }
     }
 
     planeBounds.min.x *= finalScale;
@@ -767,15 +775,10 @@ export class Text {
     for (let i = 0; i < glyphInfoArray.length; i++) {
       const glyphInfo = glyphInfoArray[i];
 
-      if (offset !== 0) {
-        glyphInfo.bounds.min.x += offset;
-        glyphInfo.bounds.max.x += offset;
-      }
-
-      glyphInfo.bounds.min.x *= finalScale;
+      glyphInfo.bounds.min.x = glyphInfo.bounds.min.x * finalScale + offsetScaled;
       glyphInfo.bounds.min.y *= finalScale;
       glyphInfo.bounds.min.z *= finalScale;
-      glyphInfo.bounds.max.x *= finalScale;
+      glyphInfo.bounds.max.x = glyphInfo.bounds.max.x * finalScale + offsetScaled;
       glyphInfo.bounds.max.y *= finalScale;
       glyphInfo.bounds.max.z *= finalScale;
     }

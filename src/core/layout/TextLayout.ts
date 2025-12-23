@@ -88,7 +88,13 @@ export class TextLayout {
           TextMeasurer.measureTextWidth(
             this.loadedFont,
             textToMeasure,
-            letterSpacing  // Letter spacing included in width measurements
+            letterSpacing // Letter spacing included in width measurements
+          ),
+        measureTextWidths: (textToMeasure: string) =>
+          TextMeasurer.measureTextWidths(
+            this.loadedFont,
+            textToMeasure,
+            letterSpacing
           )
       });
     } else {
@@ -122,6 +128,24 @@ export class TextLayout {
       max: { x: number; y: number; z: number };
     };
   } {
+    const { offset, adjustedBounds } = this.computeAlignmentOffset(options);
+    if (offset !== 0) {
+      for (let i = 0; i < vertices.length; i += 3) {
+        vertices[i] += offset;
+      }
+    }
+    return { offset, adjustedBounds };
+  }
+
+  public computeAlignmentOffset(
+    options: AlignmentOptions
+  ): {
+    offset: number;
+    adjustedBounds: {
+      min: { x: number; y: number; z: number };
+      max: { x: number; y: number; z: number };
+    };
+  } {
     const { width, align, planeBounds } = options;
     let offset = 0;
 
@@ -134,19 +158,14 @@ export class TextLayout {
       const lineWidth = planeBounds.max.x - planeBounds.min.x;
       if (align === 'center') {
         offset = (width - lineWidth) / 2 - planeBounds.min.x;
-      } else if (align === 'right') {
+      } else {
         offset = width - planeBounds.max.x;
       }
+    }
 
-      if (offset !== 0) {
-        // Translate vertices
-        for (let i = 0; i < vertices.length; i += 3) {
-          vertices[i] += offset;
-        }
-
-        adjustedBounds.min.x += offset;
-        adjustedBounds.max.x += offset;
-      }
+    if (offset !== 0) {
+      adjustedBounds.min.x += offset;
+      adjustedBounds.max.x += offset;
     }
 
     return { offset, adjustedBounds };

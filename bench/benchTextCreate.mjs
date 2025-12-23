@@ -28,11 +28,18 @@ function percentile(xs, p) {
 const args = process.argv.slice(2);
 const runsIdx = args.indexOf('--runs');
 const warmIdx = args.indexOf('--warmup');
+const alignIdx = args.indexOf('--align');
 const runs = runsIdx >= 0 ? Number(args[runsIdx + 1]) : 8;
 const warmup = warmIdx >= 0 ? Number(args[warmIdx + 1]) : 3;
+const align = alignIdx >= 0 ? String(args[alignIdx + 1]) : 'justify';
+
+if (!['left', 'center', 'right', 'justify'].includes(align)) {
+  console.error('Usage: node bench/benchTextCreate.mjs --align left|center|right|justify');
+  process.exit(1);
+}
 
 if (!Number.isFinite(runs) || runs <= 0 || !Number.isFinite(warmup) || warmup < 0) {
-  console.error('Usage: node bench/benchTextCreate.mjs --warmup 3 --runs 8');
+  console.error('Usage: node bench/benchTextCreate.mjs --warmup 3 --runs 8 --align justify');
   process.exit(1);
 }
 
@@ -62,7 +69,7 @@ const config = {
   lineHeight: 1.33,
   layout: {
     width: 1400,
-    align: 'justify',
+    align,
     direction: 'ltr',
     hyphenate: true,
     language: 'en-us'
