@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-007acc.svg)](https://www.typescriptlang.org/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3_or_later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-A high fidelity 3D font renderer and text layout engine for the web
+High fidelity 3D mesh font geometry and text layout engine for the web
 
 ![Screenshot of three-text example file](https://countertype.com/assets/three-text/3D.png)
 
@@ -15,7 +15,7 @@ A high fidelity 3D font renderer and text layout engine for the web
 > [!CAUTION]
 > three-text is an alpha release and the API may break rapidly. This warning will last at least through the end of 2025. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
-**three-text** is a high fidelity 3D font geometry and text layout library for the web. It supports TTF, OTF, and WOFF font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
+**three-text** is a 3D mesh font geometry and text layout library for the web. It supports TTF, OTF, and WOFF font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
 
 The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
