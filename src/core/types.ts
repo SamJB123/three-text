@@ -1,5 +1,5 @@
 import type { HyphenationTrieNode } from '../hyphenation';
-import type { CacheStats } from '../utils/LRUCache';
+import type { CacheStats } from '../utils/Cache';
 import type { Vec2, Vec3, BoundingBox } from './vectors';
 export type { HyphenationTrieNode };
 
@@ -226,6 +226,8 @@ export interface TextGeometryInfo {
     glyphCenter: Float32Array;
     glyphIndex: Float32Array;
     glyphLineIndex: Float32Array;
+    glyphProgress: Float32Array;
+    glyphBaselineY: Float32Array;
   };
   glyphs: GlyphGeometryInfo[];
   planeBounds: BoundingBox;
@@ -242,9 +244,7 @@ export interface TextGeometryInfo {
 
 export interface TextHandle extends TextGeometryInfo {
   getLoadedFont(): LoadedFont | undefined;
-  getCacheStatistics():
-    | (CacheStats & { hitRate: number; memoryUsageMB: number })
-    | null;
+  getCacheSize(): number;
   clearCache(): void;
   measureTextWidth(text: string, letterSpacing?: number): number;
   update(options: Partial<TextOptions>): Promise<TextHandle>;
@@ -282,7 +282,7 @@ export interface TextOptions {
   depth?: number;
   lineHeight?: number;
   letterSpacing?: number;
-  separateGlyphsWithAttributes?: boolean;
+  perGlyphAttributes?: boolean;
   fontVariations?: { [key: string]: number };
   fontFeatures?: { [tag: string]: boolean | number };
   maxTextLength?: number;

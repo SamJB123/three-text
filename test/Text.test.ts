@@ -177,7 +177,7 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
         pointsRemovedByColinear: 2,
         originalPointCount: 100
       }),
-      buildInstancedGeometry: vi.fn((clustersByLine) => {
+      buildInstancedGeometry: vi.fn((clustersByLine, depth, removeOverlaps, isCFF, scale) => {
         // Generate mock glyph infos from clusters
         const glyphInfos: any[] = [];
         let vertexOffset = 0;
@@ -193,8 +193,8 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
                     vertexStart: vertexOffset,
                     vertexCount: 20,
                     bounds: {
-                      min: { x: vertexOffset, y: 0, z: 0 },
-                      max: { x: vertexOffset + 10, y: 10, z: 0 }
+                      min: { x: vertexOffset * scale, y: 0, z: 0 },
+                      max: { x: (vertexOffset + 10) * scale, y: 10 * scale, z: 0 }
                     }
                   });
                   vertexOffset += 20;
@@ -211,7 +211,7 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
           glyphInfos,
           planeBounds: {
             min: { x: 0, y: 0, z: 0 },
-            max: { x: 1280, y: 800, z: 0 }
+            max: { x: 1280 * scale, y: 800 * scale, z: 0 }
           }
         };
       }),
@@ -593,15 +593,11 @@ describe('Text Library', () => {
 
       expect(result).toBeDefined();
       expect(result.vertices).toBeDefined();
-      expect(result.getCacheStatistics).toBeDefined();
+      expect(result.getCacheSize).toBeDefined();
 
-      // Verify cache statistics are available
-      const stats = result.getCacheStatistics();
-      expect(stats).toBeDefined();
-      if (stats) {
-        expect(typeof stats.memoryUsage).toBe('number');
-        expect(typeof stats.size).toBe('number');
-      }
+      // Verify cache size is available
+      const size = result.getCacheSize();
+      expect(size).toBeGreaterThanOrEqual(0);
     });
 
     it('uses default cache size when not specified', async () => {
@@ -616,10 +612,10 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.getCacheStatistics).toBeDefined();
+      expect(result.getCacheSize).toBeDefined();
 
-      const stats = result.getCacheStatistics();
-      expect(stats).toBeDefined();
+      const size = result.getCacheSize();
+      expect(size).toBeGreaterThanOrEqual(0);
     });
   });
 

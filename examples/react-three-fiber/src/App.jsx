@@ -569,7 +569,7 @@ function App() {
           letterSpacing={textControls.letterSpacing}
           color={resolvedColor}
           removeOverlaps={optimizationControls.removeOverlaps}
-          separateGlyphsWithAttributes={['flip', 'explode', 'orbit', 'twister'].includes(animationControls.shaderMode)}
+          perGlyphAttributes={['flip', 'explode', 'orbit', 'twister'].includes(animationControls.shaderMode)}
           curveFidelity={{
             distanceTolerance: tessellationControls.distanceTolerance,
             angleTolerance: tessellationControls.angleTolerance,

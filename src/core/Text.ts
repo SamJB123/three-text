@@ -1,4 +1,5 @@
 const DEFAULT_MAX_TEXT_LENGTH = 100000;
+const DEFAULT_FONT_SIZE = 72;
 
 import { TextLayout } from './layout/TextLayout';
 import {
@@ -137,7 +138,7 @@ export class Text {
       return {
         ...newResult,
         getLoadedFont: () => text.getLoadedFont(),
-        getCacheStatistics: () => text.getCacheStatistics(),
+        getCacheSize: () => text.getCacheSize(),
         clearCache: () => text.clearCache(),
         measureTextWidth: (textString: string, letterSpacing?: number) =>
           text.measureTextWidth(textString, letterSpacing),
@@ -148,7 +149,7 @@ export class Text {
     return {
       ...result,
       getLoadedFont: () => text.getLoadedFont(),
-      getCacheStatistics: () => text.getCacheStatistics(),
+      getCacheSize: () => text.getCacheSize(),
       clearCache: () => text.clearCache(),
       measureTextWidth: (textString: string, letterSpacing?: number) =>
         text.measureTextWidth(textString, letterSpacing),
@@ -321,7 +322,7 @@ export class Text {
   ): Promise<TextGeometryInfo> {
     perfLogger.start('Text.createGeometry', {
       textLength: options.text.length,
-      size: options.size || 72,
+      size: options.size || DEFAULT_FONT_SIZE,
       hasLayout: !!options.layout,
       mode: 'cached'
     });
@@ -340,7 +341,7 @@ export class Text {
 
       if (!this.geometryBuilder) {
         const cache = options.maxCacheSizeMB
-          ? createGlyphCache(options.maxCacheSizeMB)
+          ? createGlyphCache()
           : globalGlyphCache;
         this.geometryBuilder = new GlyphGeometryBuilder(
           cache,
@@ -418,11 +419,10 @@ export class Text {
         layoutData.depth,
         shouldRemoveOverlaps,
         this.loadedFont.metrics.isCFF,
-        options.separateGlyphsWithAttributes || false,
+        layoutData.pixelsPerFontUnit,
+        options.perGlyphAttributes ?? false,
         coloredTextIndices
       );
-
-      const cacheStats = this.geometryBuilder.getCacheStats();
 
       const result = this.finalizeGeometry(
         shapedResult.vertices,
@@ -431,11 +431,10 @@ export class Text {
         shapedResult.glyphInfos,
         shapedResult.planeBounds,
         options,
-        cacheStats,
         options.text
       );
 
-      if (options.separateGlyphsWithAttributes) {
+      if (options.perGlyphAttributes) {
         const glyphAttrs = this.createGlyphAttributes(
           result.vertices.length / 3,
           result.glyphs
@@ -519,7 +518,7 @@ export class Text {
 
     const {
       text,
-      size = 72,
+      size = DEFAULT_FONT_SIZE,
       depth = 0,
       lineHeight = 1.0,
       letterSpacing = 0,
@@ -550,15 +549,16 @@ export class Text {
       shortLineThreshold
     } = layout;
 
+    const fontUnitsPerPixel = this.loadedFont.upem / size;
+
     let widthInFontUnits: number | undefined;
     if (width !== undefined) {
-      widthInFontUnits = width * (this.loadedFont.upem / size);
+      widthInFontUnits = width * fontUnitsPerPixel;
     }
 
     // Keep depth behavior consistent with Extruder: extremely small non-zero depths
-    // are clamped to a minimum back offset so the back face is not coplanar.
-    const depthScale = this.loadedFont.upem / size;
-    const rawDepthInFontUnits = depth * depthScale;
+    // are clamped to a minimum back offset to prevent Z fighting
+    const rawDepthInFontUnits = depth * fontUnitsPerPixel;
     const minExtrudeDepth = this.loadedFont.upem * 0.000025;
     const depthInFontUnits =
       rawDepthInFontUnits <= 0
@@ -607,7 +607,8 @@ export class Text {
       align,
       direction,
       depth: depthInFontUnits,
-      size
+      size,
+      pixelsPerFontUnit: 1 / fontUnitsPerPixel
     };
   }
 
@@ -729,10 +730,9 @@ export class Text {
       max: { x: number; y: number; z: number };
     },
     options: TextOptions,
-    cacheStats?: any,
     originalText?: string
   ): TextGeometryInfo {
-    const { layout = {}, size = 72 } = options;
+    const { layout = {} } = options;
     const { width, align = layout.direction === 'rtl' ? 'right' : 'left' } =
       layout;
 
@@ -750,41 +750,14 @@ export class Text {
     planeBounds.min.x = alignmentResult.adjustedBounds.min.x;
     planeBounds.max.x = alignmentResult.adjustedBounds.max.x;
 
-    const finalScale = size / this.loadedFont!.upem;
-
-    const offsetScaled = offset * finalScale;
-
-    // Scale vertices only (normals are unit vectors, don't scale)
-    if (offsetScaled === 0) {
-      for (let i = 0; i < vertices.length; i++) {
-        vertices[i] *= finalScale;
-      }
-    } else {
+    if (offset !== 0) {
       for (let i = 0; i < vertices.length; i += 3) {
-        vertices[i] = vertices[i] * finalScale + offsetScaled;
-        vertices[i + 1] *= finalScale;
-        vertices[i + 2] *= finalScale;
+        vertices[i] += offset;
       }
-    }
-
-    planeBounds.min.x *= finalScale;
-    planeBounds.min.y *= finalScale;
-    planeBounds.min.z *= finalScale;
-    planeBounds.max.x *= finalScale;
-    planeBounds.max.y *= finalScale;
-    planeBounds.max.z *= finalScale;
-
-    for (let i = 0; i < glyphInfoArray.length; i++) {
-      const glyphInfo = glyphInfoArray[i];
-
-      glyphInfo.bounds.min.x =
-        glyphInfo.bounds.min.x * finalScale + offsetScaled;
-      glyphInfo.bounds.min.y *= finalScale;
-      glyphInfo.bounds.min.z *= finalScale;
-      glyphInfo.bounds.max.x =
-        glyphInfo.bounds.max.x * finalScale + offsetScaled;
-      glyphInfo.bounds.max.y *= finalScale;
-      glyphInfo.bounds.max.z *= finalScale;
+      for (let i = 0; i < glyphInfoArray.length; i++) {
+        glyphInfoArray[i].bounds.min.x += offset;
+        glyphInfoArray[i].bounds.max.x += offset;
+      }
     }
 
     let colors: Float32Array | undefined;
@@ -819,8 +792,7 @@ export class Text {
         pointsRemovedByVisvalingam:
           optimizationStats.pointsRemovedByVisvalingam,
         pointsRemovedByColinear: optimizationStats.pointsRemovedByColinear,
-        originalPointCount: optimizationStats.originalPointCount,
-        ...(cacheStats || {})
+        originalPointCount: optimizationStats.originalPointCount
       },
       query: (options: TextQueryOptions) => {
         if (!originalText) {
@@ -889,11 +861,11 @@ export class Text {
     return TextMeasurer.measureTextWidth(this.loadedFont, text, letterSpacing);
   }
 
-  public getCacheStatistics() {
+  public getCacheSize(): number {
     if (this.geometryBuilder) {
-      return this.geometryBuilder.getCacheStats();
+      return this.geometryBuilder.getCacheStats().size;
     }
-    return null;
+    return 0;
   }
 
   public clearCache() {
@@ -909,34 +881,54 @@ export class Text {
     glyphCenter: Float32Array;
     glyphIndex: Float32Array;
     glyphLineIndex: Float32Array;
+    glyphProgress: Float32Array;
+    glyphBaselineY: Float32Array;
   } {
     const glyphCenters = new Float32Array(vertexCount * 3);
     const glyphIndices = new Float32Array(vertexCount);
     const glyphLineIndices = new Float32Array(vertexCount);
+    const glyphProgress = new Float32Array(vertexCount);
+    const glyphBaselineY = new Float32Array(vertexCount);
 
-    glyphs.forEach((glyph, index) => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = 0; i < glyphs.length; i++) {
+      const cx = (glyphs[i].bounds.min.x + glyphs[i].bounds.max.x) / 2;
+      if (cx < minX) minX = cx;
+      if (cx > maxX) maxX = cx;
+    }
+    const range = maxX - minX;
+
+    for (let index = 0; index < glyphs.length; index++) {
+      const glyph = glyphs[index];
       const centerX = (glyph.bounds.min.x + glyph.bounds.max.x) / 2;
       const centerY = (glyph.bounds.min.y + glyph.bounds.max.y) / 2;
       const centerZ = (glyph.bounds.min.z + glyph.bounds.max.z) / 2;
+      const baselineY = glyph.bounds.min.y;
+      const progress = range > 0 ? (centerX - minX) / range : 0;
 
-      for (let i = 0; i < glyph.vertexCount; i++) {
-        const vertexIndex = glyph.vertexStart + i;
+      const start = glyph.vertexStart;
+      const end = Math.min(start + glyph.vertexCount, vertexCount);
+      if (end <= start) continue;
 
-        if (vertexIndex < vertexCount) {
-          glyphCenters[vertexIndex * 3] = centerX;
-          glyphCenters[vertexIndex * 3 + 1] = centerY;
-          glyphCenters[vertexIndex * 3 + 2] = centerZ;
+      glyphIndices.fill(index, start, end);
+      glyphLineIndices.fill(glyph.lineIndex, start, end);
+      glyphProgress.fill(progress, start, end);
+      glyphBaselineY.fill(baselineY, start, end);
 
-          glyphIndices[vertexIndex] = index;
-          glyphLineIndices[vertexIndex] = glyph.lineIndex;
-        }
+      for (let v = start * 3; v < end * 3; v += 3) {
+        glyphCenters[v] = centerX;
+        glyphCenters[v + 1] = centerY;
+        glyphCenters[v + 2] = centerZ;
       }
-    });
+    }
 
     return {
       glyphCenter: glyphCenters,
       glyphIndex: glyphIndices,
-      glyphLineIndex: glyphLineIndices
+      glyphLineIndex: glyphLineIndices,
+      glyphProgress,
+      glyphBaselineY
     };
   }
 

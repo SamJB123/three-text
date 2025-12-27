@@ -11,6 +11,8 @@ export interface WebGLBufferSet {
     glyphCenter?: WebGLBuffer;
     glyphIndex?: WebGLBuffer;
     glyphLineIndex?: WebGLBuffer;
+    glyphProgress?: WebGLBuffer;
+    glyphBaselineY?: WebGLBuffer;
   };
   attributes: {
     position: { size: number; type: GLenum; normalized: boolean };
@@ -19,6 +21,8 @@ export interface WebGLBufferSet {
     glyphCenter?: { size: number; type: GLenum; normalized: boolean };
     glyphIndex?: { size: number; type: GLenum; normalized: boolean };
     glyphLineIndex?: { size: number; type: GLenum; normalized: boolean };
+    glyphProgress?: { size: number; type: GLenum; normalized: boolean };
+    glyphBaselineY?: { size: number; type: GLenum; normalized: boolean };
   };
   drawCount: number;
   mode: GLenum;
@@ -92,13 +96,25 @@ export function createWebGLBuffers(
     if (!glyphLineIndexBuffer)
       throw new Error('Failed to create glyphLineIndex buffer');
     gl.bindBuffer(gl.ARRAY_BUFFER, glyphLineIndexBuffer);
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      glyphAttributes.glyphLineIndex,
-      gl.STATIC_DRAW
-    );
+    gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphLineIndex, gl.STATIC_DRAW);
     buffers.glyphLineIndex = glyphLineIndexBuffer;
     attributes.glyphLineIndex = { size: 1, type: gl.FLOAT, normalized: false };
+
+    const glyphProgressBuffer = gl.createBuffer();
+    if (!glyphProgressBuffer)
+      throw new Error('Failed to create glyphProgress buffer');
+    gl.bindBuffer(gl.ARRAY_BUFFER, glyphProgressBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphProgress, gl.STATIC_DRAW);
+    buffers.glyphProgress = glyphProgressBuffer;
+    attributes.glyphProgress = { size: 1, type: gl.FLOAT, normalized: false };
+
+    const glyphBaselineYBuffer = gl.createBuffer();
+    if (!glyphBaselineYBuffer)
+      throw new Error('Failed to create glyphBaselineY buffer');
+    gl.bindBuffer(gl.ARRAY_BUFFER, glyphBaselineYBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphBaselineY, gl.STATIC_DRAW);
+    buffers.glyphBaselineY = glyphBaselineYBuffer;
+    attributes.glyphBaselineY = { size: 1, type: gl.FLOAT, normalized: false };
   }
 
   return {
@@ -114,6 +130,8 @@ export function createWebGLBuffers(
       if (buffers.glyphCenter) gl.deleteBuffer(buffers.glyphCenter);
       if (buffers.glyphIndex) gl.deleteBuffer(buffers.glyphIndex);
       if (buffers.glyphLineIndex) gl.deleteBuffer(buffers.glyphLineIndex);
+      if (buffers.glyphProgress) gl.deleteBuffer(buffers.glyphProgress);
+      if (buffers.glyphBaselineY) gl.deleteBuffer(buffers.glyphBaselineY);
     }
   };
 }

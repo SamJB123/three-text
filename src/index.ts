@@ -3,7 +3,7 @@ export { Text } from './core/Text';
 export { DEFAULT_CURVE_FIDELITY } from './core/geometry/Polygonizer';
 export { FontMetadataExtractor } from './core/font/FontMetadata';
 export { globalGlyphCache, createGlyphCache } from './core/cache/sharedCaches';
-export type { CacheStats } from './utils/LRUCache';
+export type { CacheStats } from './utils/Cache';
 
 export type {
   TextAlign,

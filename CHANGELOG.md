@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0] - 2025-12-26
+
+### Breaking changes
+
+- `import 'three-text'` now points to Three.js adapter (was core library). Use `import 'three-text/core'` for core library. (`import 'three-text/three'` still works)
+- `getCacheStatistics()` → `getCacheSize()` (returns number instead of stats object)
+- `separateGlyphsWithAttributes` renamed to `perGlyphAttributes`
+
+### Added
+
+- `perGlyphAttributes` now includes `glyphProgress` (0..1 along text run) and `glyphBaselineY` for spline effects
+
+### Performance
+
+- Faster geometry generation
+- `Extruder`: Integer bit-packing, consolidated edge tracking, optimized flat case
+- `GlyphGeometryBuilder`: Merged scaling into vertex write pass, eliminating separate scaling loop
+- `Cache`: Replaced LRU with simple Map wrapper
+
 ## [0.2.19] - 2025-12-23
 
 ### Fixed

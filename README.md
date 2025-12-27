@@ -562,13 +562,15 @@ For shader-based animations and interactive effects, the library can generate pe
 const text = await Text.create({
   text: 'Sample text',
   font: '/fonts/Font.ttf',
-  separateGlyphsWithAttributes: true,
+  perGlyphAttributes: true,
 });
 
 // Geometry includes these vertex attributes:
 // - glyphCenter (vec3): center point of each glyph
 // - glyphIndex (float): sequential glyph index
 // - glyphLineIndex (float): line number
+// - glyphProgress (float): normalized position (0..1) along text run
+// - glyphBaselineY (float): Y coordinate of glyph baseline
 ```
 
 This option bypasses overlap-based clustering and adds vertex attributes suitable for per-character manipulation in vertex shaders. Each unique glyph is still tessellated only once and cached for reuse. The tradeoff is potential visual artifacts where glyphs actually overlap (tight kerning, cursive scripts)
@@ -761,7 +763,7 @@ interface TextOptions {
   fontVariations?: { [key: string]: number }; // Variable font axis settings
   fontFeatures?: { [tag: string]: boolean | number }; // OpenType feature settings
   removeOverlaps?: boolean; // Override default overlap removal (auto-enabled for VF only)
-  separateGlyphsWithAttributes?: boolean; // Force individual glyph tessellation and add shader attributes
+  perGlyphAttributes?: boolean; // Keep per-glyph identity and add per-glyph shader attributes
   color?: [number, number, number] | ColorOptions; // Text coloring (simple or complex)
   // Configuration for geometry generation and layout
   curveFidelity?: CurveFidelityConfig;
@@ -842,6 +844,8 @@ interface TextGeometryInfo {
     glyphCenter: Float32Array;
     glyphIndex: Float32Array;
     glyphLineIndex: Float32Array;
+    glyphProgress: Float32Array;
+    glyphBaselineY: Float32Array;
   };
   glyphs: GlyphGeometryInfo[];
   planeBounds: {

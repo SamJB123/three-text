@@ -25,7 +25,7 @@ import {
 } from '../shaping/DrawCallbacks';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
 import { HarfBuzzGlyph } from '../types';
-import { LRUCache } from '../../utils/LRUCache';
+import { Cache } from '../../utils/Cache';
 import { DEFAULT_CURVE_FIDELITY } from '../geometry/Polygonizer';
 import { DEFAULT_OPTIMIZATION_CONFIG } from '../geometry/PathOptimizer';
 
@@ -41,7 +41,7 @@ export interface InstancedTextGeometry {
 }
 
 export class GlyphGeometryBuilder {
-  private cache: LRUCache<string, GlyphData>;
+  private cache: Cache<string, GlyphData>;
   private tessellator: Tessellator;
   private extruder: Extruder;
   private fontId: string = 'default';
@@ -52,15 +52,15 @@ export class GlyphGeometryBuilder {
   private collector: GlyphContourCollector;
   private drawCallbacks: DrawCallbackHandler;
   private loadedFont: LoadedFont;
-  private wordCache: LRUCache<string, GlyphData>;
-  private contourCache: LRUCache<string, GlyphContours>;
-  private clusteringCache: LRUCache<
+  private wordCache: Cache<string, GlyphData>;
+  private contourCache: Cache<string, GlyphContours>;
+  private clusteringCache: Cache<
     string,
     { glyphIds: number[]; groups: number[][] }
   >;
   private emptyGlyphs: Set<number> = new Set();
 
-  constructor(cache: LRUCache<string, GlyphData>, loadedFont: LoadedFont) {
+  constructor(cache: Cache<string, GlyphData>, loadedFont: LoadedFont) {
     this.cache = cache;
     this.loadedFont = loadedFont;
     this.tessellator = new Tessellator();
@@ -135,6 +135,7 @@ export class GlyphGeometryBuilder {
     depth: number,
     removeOverlaps: boolean,
     isCFF: boolean,
+    scale: number,
     separateGlyphs: boolean = false,
     coloredTextIndices?: Set<number>
   ): InstancedTextGeometry {
@@ -422,9 +423,9 @@ export class GlyphGeometryBuilder {
       const pz = task.pz;
 
       for (let j = 0; j < v.length; j += 3) {
-        vertexArray[vertexPos++] = v[j] + px;
-        vertexArray[vertexPos++] = v[j + 1] + py;
-        vertexArray[vertexPos++] = v[j + 2] + pz;
+        vertexArray[vertexPos++] = (v[j] + px) * scale;
+        vertexArray[vertexPos++] = (v[j + 1] + py) * scale;
+        vertexArray[vertexPos++] = (v[j + 2] + pz) * scale;
       }
 
       normalArray.set(n, normalPos);
@@ -437,6 +438,22 @@ export class GlyphGeometryBuilder {
     }
 
     perfLogger.end('GlyphGeometryBuilder.buildInstancedGeometry');
+
+    planeBounds.min.x *= scale;
+    planeBounds.min.y *= scale;
+    planeBounds.min.z *= scale;
+    planeBounds.max.x *= scale;
+    planeBounds.max.y *= scale;
+    planeBounds.max.z *= scale;
+
+    for (let i = 0; i < glyphInfos.length; i++) {
+      glyphInfos[i].bounds.min.x *= scale;
+      glyphInfos[i].bounds.min.y *= scale;
+      glyphInfos[i].bounds.min.z *= scale;
+      glyphInfos[i].bounds.max.x *= scale;
+      glyphInfos[i].bounds.max.y *= scale;
+      glyphInfos[i].bounds.max.z *= scale;
+    }
 
     return {
       vertices: vertexArray,
@@ -454,7 +471,6 @@ export class GlyphGeometryBuilder {
   ): string {
     if (glyphs.length === 0) return '';
 
-    // Normalize positions relative to the first glyph in the cluster
     const refX = glyphs[0].x ?? 0;
     const refY = glyphs[0].y ?? 0;
 

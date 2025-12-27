@@ -38,3 +38,4 @@ describe('TextLayout performance', () => {
     layout.applyAlignment(vertices, { width, align: 'right', planeBounds });
   });
 });
+

@@ -14,7 +14,6 @@ import type {
   TextHandle as CoreTextHandle
 } from '../core/types';
 import type { HyphenationTrieNode } from '../hyphenation';
-import type { CacheStats } from '../utils/LRUCache';
 
 // Three.js specific interface that includes BufferGeometry
 export interface ThreeTextGeometryInfo
@@ -25,9 +24,7 @@ export interface ThreeTextGeometryInfo
   geometry: BufferGeometry;
   // Utility methods from core
   getLoadedFont(): LoadedFont | undefined;
-  getCacheStatistics():
-    | (CacheStats & { hitRate: number; memoryUsageMB: number })
-    | null;
+  getCacheSize(): number;
   clearCache(): void;
   measureTextWidth(text: string, letterSpacing?: number): number;
   update(options: Partial<TextOptions>): Promise<ThreeTextGeometryInfo>;
@@ -67,6 +64,14 @@ function convertToThree(result: CoreTextHandle): ThreeTextGeometryInfo {
       'glyphLineIndex',
       new Float32BufferAttribute(result.glyphAttributes.glyphLineIndex, 1)
     );
+    geometry.setAttribute(
+      'glyphProgress',
+      new Float32BufferAttribute(result.glyphAttributes.glyphProgress, 1)
+    );
+    geometry.setAttribute(
+      'glyphBaselineY',
+      new Float32BufferAttribute(result.glyphAttributes.glyphBaselineY, 1)
+    );
   }
 
   geometry.computeBoundingBox();
@@ -81,7 +86,7 @@ function convertToThree(result: CoreTextHandle): ThreeTextGeometryInfo {
     coloredRanges: result.coloredRanges,
     // Pass through utility methods from core
     getLoadedFont: result.getLoadedFont,
-    getCacheStatistics: result.getCacheStatistics,
+    getCacheSize: result.getCacheSize,
     clearCache: result.clearCache,
     measureTextWidth: result.measureTextWidth,
     update: async (newOptions: Partial<TextOptions>) => {
