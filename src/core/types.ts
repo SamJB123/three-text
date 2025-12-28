@@ -291,7 +291,6 @@ export interface TextOptions {
   geometryOptimization?: GeometryOptimizationOptions;
   layout?: LayoutOptions;
   color?: [number, number, number] | ColorOptions;
-  maxCacheSizeMB?: number;
 }
 
 export interface HyphenationPatternsMap {
@@ -299,8 +298,8 @@ export interface HyphenationPatternsMap {
 }
 
 export interface CurveFidelityConfig {
-  distanceTolerance?: number;
-  angleTolerance?: number;
+  distanceTolerance?: number; // max deviation from true curve, in font units (default: 0.5)
+  angleTolerance?: number;    // max angle between segments in radians (default: 0.2)
 }
 
 export interface GeometryOptimizationOptions {

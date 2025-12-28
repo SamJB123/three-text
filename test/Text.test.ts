@@ -583,35 +583,14 @@ describe('Text Library', () => {
       await Text.init();
       const buffer = getFontBuffer();
 
-      // Create text with custom cache size
       const result = await Text.create({
         font: buffer,
         text: 'Cache Test',
-        size: 72,
-        maxCacheSizeMB: 1024 // 1GB cache
+        size: 72
       });
 
       expect(result).toBeDefined();
       expect(result.vertices).toBeDefined();
-      expect(result.getCacheSize).toBeDefined();
-
-      // Verify cache size is available
-      const size = result.getCacheSize();
-      expect(size).toBeGreaterThanOrEqual(0);
-    });
-
-    it('uses default cache size when not specified', async () => {
-      await Text.init();
-      const buffer = getFontBuffer();
-
-      const result = await Text.create({
-        font: buffer,
-        text: 'Default Cache Test',
-        size: 72
-        // No maxCacheSizeMB specified - should use default 250MB
-      });
-
-      expect(result).toBeDefined();
       expect(result.getCacheSize).toBeDefined();
 
       const size = result.getCacheSize();

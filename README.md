@@ -348,19 +348,12 @@ The library converts bezier curves into line segments by recursively subdividing
 In general, this step helps more with time to first render than ongoing interactions in the scene
 
 ```javascript
-// Using the default configuration
-const text = await Text.create({
-  text: 'Sample text',
-  font: '/fonts/Font.ttf',
-  size: 72,
-});
-
 const text = await Text.create({
   text: 'Sample text',
   font: '/fonts/Font.ttf',
   curveFidelity: {
-    distanceTolerance: 0.2, // Tighter tolerance for smoother curves
-    angleTolerance: 0.1,    // Sharper angle preservation
+    distanceTolerance: 0.2,
+    angleTolerance: 0.1,
   },
 });
 ```
@@ -714,7 +707,7 @@ mesh.geometry.dispose();
 mesh.geometry = updated.geometry;
 ```
 
-The method preserves custom cache instances if `maxCacheSizeMB` was specified. For most use cases, this is primarily an API convenience
+For most use cases, this is primarily an API convenience over calling `create()` again
 
 Options merge at the top level - to remove a nested property like `layout.width`, pass `{ layout: { width: undefined } }`
 
@@ -765,7 +758,6 @@ interface TextOptions {
   removeOverlaps?: boolean; // Override default overlap removal (auto-enabled for VF only)
   perGlyphAttributes?: boolean; // Keep per-glyph identity and add per-glyph shader attributes
   color?: [number, number, number] | ColorOptions; // Text coloring (simple or complex)
-  // Configuration for geometry generation and layout
   curveFidelity?: CurveFidelityConfig;
   geometryOptimization?: GeometryOptimizationOptions;
   layout?: LayoutOptions;
@@ -902,30 +894,9 @@ interface TextRange {
 
 ## Memory management
 
-`three-text` manages memory in two ways: a shared glyph cache for all text, and instance-specific resources for each piece of text you create
+Tessellated glyphs are cached in a shared global cache to avoid recomputation when the same characters appear multiple times. Fonts are also cached and persist for the application lifetime
 
-The shared cache is handled automatically through an LRU (Least Recently Used) policy. The default cache size is 250MB, but you can configure it per text instance. Tessellated glyphs are cached to avoid expensive recomputation when the same characters (or clusters of overlapping characters) appear multiple times
-
-```javascript
-const text = await Text.create({
-  text: 'Hello world',
-  font: '/fonts/font.ttf',
-  size: 72,
-  maxCacheSizeMB: 1024, // Custom cache size in MB
-});
-
-// Check cache performance
-const stats = text.getCacheStatistics();
-console.log('Cache Statistics:', {
-  hitRate: stats.hitRate,                // Cache hit percentage
-  memoryUsageMB: stats.memoryUsageMB,    // Memory used in MB
-  size: stats.size,                      // Entries in cache
-  hits: stats.hits,                      // Cache hits
-  misses: stats.misses                   // Cache misses
-});
-```
-
-Fonts are cached internally and persist for the application lifetime. The glyph geometry cache uses an LRU eviction policy, so memory usage is bounded by `maxCacheSizeMB`. When a text mesh is no longer needed, dispose of its geometry as you would any Three.js `BufferGeometry`:
+When a text mesh is no longer needed, dispose of its geometry as you would any Three.js `BufferGeometry`:
 
 ```javascript
 textMesh.geometry.dispose();

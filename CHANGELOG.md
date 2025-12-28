@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.1] - 2025-12-27
+
+### Breaking changes
+
+- Removed `maxCacheSizeMB` option (was non-functional after 0.3.0 LRU removal)
+
+### Fixed
+
+- Minified builds: public API properties no longer mangled
+
 ## [0.3.0] - 2025-12-26
 
 ### Breaking changes

@@ -28,7 +28,7 @@ import { loadPattern } from '../hyphenation/HyphenationPatternLoader';
 import type { HyphenationTrieNode } from '../hyphenation';
 import { GlyphGeometryBuilder } from './cache/GlyphGeometryBuilder';
 import { TextShaper } from './shaping/TextShaper';
-import { globalGlyphCache, createGlyphCache } from './cache/sharedCaches';
+import { globalGlyphCache } from './cache/sharedCaches';
 import { HarfBuzzLoader } from './shaping/HarfBuzzLoader';
 import { TextRangeQuery } from './layout/TextRangeQuery';
 
@@ -103,7 +103,6 @@ export class Text {
     const text = new Text();
     text.setLoadedFont(loadedFont);
 
-    // Pass full options so createGeometry honors maxCacheSizeMB etc
     const result = await text.createGeometry(options);
 
     // Recursive update function
@@ -340,11 +339,8 @@ export class Text {
       this.updateFontVariations(options);
 
       if (!this.geometryBuilder) {
-        const cache = options.maxCacheSizeMB
-          ? createGlyphCache()
-          : globalGlyphCache;
         this.geometryBuilder = new GlyphGeometryBuilder(
-          cache,
+          globalGlyphCache,
           this.loadedFont!
         );
         this.geometryBuilder.setFontId(this.currentFontId);
