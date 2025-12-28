@@ -5,9 +5,7 @@ export interface TableDirectoryEntry {
   length: number;
 }
 
-// Parses the SFNT table directory for TTF/OTF fonts
-// Assumes the DataView is positioned at the start of an sfnt font (offset 0)
-// Table records are 16 bytes each starting at byte offset 12
+// SFNT table directory
 export function parseTableDirectory(
   view: DataView
 ): Map<number, TableDirectoryEntry> {

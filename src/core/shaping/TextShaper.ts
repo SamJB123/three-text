@@ -98,7 +98,7 @@ export class TextShaper {
 
     const clusters: GlyphCluster[] = [];
     let currentClusterGlyphs: HarfBuzzGlyph[] = [];
-    let currentClusterText = '';
+    let clusterTextChars: string[] = [];
     let clusterStartX = 0;
     let clusterStartY = 0;
 
@@ -115,20 +115,28 @@ export class TextShaper {
     );
 
     const cjkAdjustment = this.calculateCJKAdjustment(lineInfo, align);
+    const lineText = lineInfo.text;
+    const lineTextLength = lineText.length;
+    const glyphCount = glyphInfos.length;
+    let nextCharIsCJK: boolean | undefined;
 
-    for (let i = 0; i < glyphInfos.length; i++) {
+    for (let i = 0; i < glyphCount; i++) {
       const glyph = glyphInfos[i];
-      const isWhitespace = /\s/.test(lineInfo.text[glyph.cl]);
+      const charIndex = glyph.cl;
+      const char = lineText[charIndex];
+      const charCode = char.charCodeAt(0);
+      const isWhitespace =
+        charCode === 32 || charCode === 9 || charCode === 10 || charCode === 13;
 
       // Inserted hyphens inherit the color of the last character in the word
       if (
         lineInfo.endedWithHyphen &&
-        glyph.cl === lineInfo.text.length - 1 &&
-        lineInfo.text[glyph.cl] === '-'
+        charIndex === lineTextLength - 1 &&
+        char === '-'
       ) {
         glyph.absoluteTextIndex = lineInfo.originalEnd;
       } else {
-        glyph.absoluteTextIndex = lineInfo.originalStart + glyph.cl;
+        glyph.absoluteTextIndex = lineInfo.originalStart + charIndex;
       }
 
       glyph.lineIndex = lineIndex;
@@ -138,12 +146,12 @@ export class TextShaper {
       if (isWhitespace) {
         if (currentClusterGlyphs.length > 0) {
           clusters.push({
-            text: currentClusterText,
+            text: clusterTextChars.join(''),
             glyphs: currentClusterGlyphs,
             position: new Vec3(clusterStartX, clusterStartY, cursorZ)
           });
           currentClusterGlyphs = [];
-          currentClusterText = '';
+          clusterTextChars = [];
         }
       }
 
@@ -158,13 +166,13 @@ export class TextShaper {
         glyph.x = absoluteGlyphX - clusterStartX;
         glyph.y = absoluteGlyphY - clusterStartY;
         currentClusterGlyphs.push(glyph);
-        currentClusterText += lineInfo.text[glyph.cl];
+        clusterTextChars.push(char);
       }
 
       cursorX += glyph.ax;
       cursorY += glyph.ay;
 
-      if (letterSpacingFU !== 0 && i < glyphInfos.length - 1) {
+      if (letterSpacingFU !== 0 && i < glyphCount - 1) {
         cursorX += letterSpacingFU;
       }
 
@@ -173,27 +181,26 @@ export class TextShaper {
       }
 
       // CJK glue adjustment (must match exactly where LineBreak adds glue)
-      if (cjkAdjustment !== 0 && i < glyphInfos.length - 1 && !isWhitespace) {
-        const currentChar = lineInfo.text[glyph.cl];
+      if (cjkAdjustment !== 0 && i < glyphCount - 1 && !isWhitespace) {
         const nextGlyph = glyphInfos[i + 1];
-        const nextChar = lineInfo.text[nextGlyph.cl];
+        const nextChar = lineText[nextGlyph.cl];
+        const isCJK =
+          nextCharIsCJK !== undefined ? nextCharIsCJK : LineBreak.isCJK(char);
+        nextCharIsCJK = nextChar ? LineBreak.isCJK(nextChar) : false;
 
-        const isCJKChar = LineBreak.isCJK(currentChar);
-        const nextIsCJKChar = nextChar && LineBreak.isCJK(nextChar);
-
-        if (isCJKChar && nextIsCJKChar) {
+        if (isCJK && nextCharIsCJK) {
           let shouldApply = true;
 
           if (LineBreak.isCJClosingPunctuation(nextChar)) {
             shouldApply = false;
           }
 
-          if (LineBreak.isCJOpeningPunctuation(currentChar)) {
+          if (LineBreak.isCJOpeningPunctuation(char)) {
             shouldApply = false;
           }
 
           if (
-            LineBreak.isCJPunctuation(currentChar) &&
+            LineBreak.isCJPunctuation(char) &&
             LineBreak.isCJPunctuation(nextChar)
           ) {
             shouldApply = false;
@@ -203,12 +210,14 @@ export class TextShaper {
             cursorX += cjkAdjustment;
           }
         }
+      } else {
+        nextCharIsCJK = undefined;
       }
     }
 
     if (currentClusterGlyphs.length > 0) {
       clusters.push({
-        text: currentClusterText,
+        text: clusterTextChars.join(''),
         glyphs: currentClusterGlyphs,
         position: new Vec3(clusterStartX, clusterStartY, cursorZ)
       });

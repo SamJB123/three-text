@@ -74,7 +74,6 @@ export class WoffConverter {
     sfntView.setUint16(8, Math.floor(Math.log2(numTables)));
     sfntView.setUint16(10, numTables * 16 - searchRange);
 
-    // Read and decompress table directory
     let sfntOffset = 12 + numTables * 16; // Start of table data
 
     const tableDirectory: Array<{
@@ -100,41 +99,37 @@ export class WoffConverter {
     // Sort tables by tag (required for SFNT)
     tableDirectory.sort((a, b) => a.tag - b.tag);
 
-    // Write SFNT table directory and decompress tables
-    for (let i = 0; i < numTables; i++) {
-      const table = tableDirectory[i];
-      const dirOffset = 12 + i * 16;
-
-      // Write SFNT table directory entry
-      sfntView.setUint32(dirOffset, table.tag);
-      sfntView.setUint32(dirOffset + 4, table.checksum);
-      sfntView.setUint32(dirOffset + 8, sfntOffset);
-      sfntView.setUint32(dirOffset + 12, table.origLength);
-
-      // Decompress or copy table data
-      if (table.length === table.origLength) {
-        // Uncompressed table - just copy
-        sfntData.set(
-          data.subarray(table.offset, table.offset + table.length),
-          sfntOffset
-        );
-      } else {
-        // Compressed table - decompress using DecompressionStream
+    // Tables are independent, decompress in parallel
+    const decompressedTables = await Promise.all(
+      tableDirectory.map(async (table) => {
+        if (table.length === table.origLength) {
+          return data.subarray(table.offset, table.offset + table.length);
+        }
         const compressedData = data.subarray(
           table.offset,
           table.offset + table.length
         );
-
         const decompressed = await WoffConverter.decompressZlib(compressedData);
-
         if (decompressed.byteLength !== table.origLength) {
           throw new Error(
             `Decompression failed: expected ${table.origLength} bytes, got ${decompressed.byteLength}`
           );
         }
+        return new Uint8Array(decompressed);
+      })
+    );
 
-        sfntData.set(new Uint8Array(decompressed), sfntOffset);
-      }
+    // Write SFNT table directory and table data
+    for (let i = 0; i < numTables; i++) {
+      const table = tableDirectory[i];
+      const dirOffset = 12 + i * 16;
+
+      sfntView.setUint32(dirOffset, table.tag);
+      sfntView.setUint32(dirOffset + 4, table.checksum);
+      sfntView.setUint32(dirOffset + 8, sfntOffset);
+      sfntView.setUint32(dirOffset + 12, table.origLength);
+
+      sfntData.set(decompressedTables[i], sfntOffset);
 
       // Add padding to 4-byte boundary
       sfntOffset += table.origLength;

@@ -50,8 +50,12 @@ export class Text {
   // Stringify with sorted keys for cache stability
   private static stableStringify(obj: { [key: string]: any }): string {
     const keys = Object.keys(obj).sort();
-    const pairs = keys.map((k) => `${k}:${obj[k]}`);
-    return pairs.join(',');
+    let result = '';
+    for (let i = 0; i < keys.length; i++) {
+      if (i > 0) result += ',';
+      result += keys[i] + ':' + obj[keys[i]];
+    }
+    return result;
   }
 
   private fontLoader: FontLoader;
@@ -381,18 +385,21 @@ export class Text {
       // to selectively use glyph-level caching (separate vertices) only for clusters containing
       // colored text, while non-colored clusters can still use fast cluster-level merging
       let coloredTextIndices: Set<number> | undefined;
+      let byTextMatches: { pattern: string; start: number; end: number }[] | undefined;
       if (
         options.color &&
         typeof options.color === 'object' &&
         !Array.isArray(options.color)
       ) {
         if (options.color.byText || options.color.byCharRange) {
-          // Build the set manually since glyphs don't exist yet
+          // Glyphs don't exist yet, so we scan text directly
           coloredTextIndices = new Set<number>();
           if (options.color.byText) {
+            byTextMatches = [];
             for (const pattern of Object.keys(options.color.byText)) {
               let index = 0;
               while ((index = options.text.indexOf(pattern, index)) !== -1) {
+                byTextMatches.push({ pattern, start: index, end: index + pattern.length });
                 for (let i = index; i < index + pattern.length; i++) {
                   coloredTextIndices.add(i);
                 }
@@ -427,7 +434,8 @@ export class Text {
         shapedResult.glyphInfos,
         shapedResult.planeBounds,
         options,
-        options.text
+        options.text,
+        byTextMatches
       );
 
       if (options.perGlyphAttributes) {
@@ -612,7 +620,8 @@ export class Text {
     vertices: Float32Array,
     glyphInfoArray: GlyphGeometryInfo[],
     color: [number, number, number] | ColorOptions,
-    originalText: string
+    originalText: string,
+    byTextMatches?: { pattern: string; start: number; end: number }[]
   ): { colors: Float32Array; coloredRanges: ColoredRange[] } {
     const vertexCount = vertices.length / 3;
     const colors = new Float32Array(vertexCount * 3);
@@ -647,38 +656,52 @@ export class Text {
         colors[i + 2] = defaultColor[2];
       }
 
-      // Apply text-based coloring using query system
-      if (color.byText) {
-        const rangeQuery = new TextRangeQuery(originalText, glyphInfoArray);
-        const textRanges = rangeQuery.execute({
-          byText: Object.keys(color.byText)
-        });
+      if (color.byText && byTextMatches) {
+        const glyphsByTextIndex = new Map<number, GlyphGeometryInfo[]>();
+        for (const glyph of glyphInfoArray) {
+          const existing = glyphsByTextIndex.get(glyph.textIndex);
+          if (existing) {
+            existing.push(glyph);
+          } else {
+            glyphsByTextIndex.set(glyph.textIndex, [glyph]);
+          }
+        }
 
-        textRanges.forEach((range) => {
-          const targetColor = color.byText![range.originalText];
-          if (targetColor) {
-            range.glyphs.forEach((glyph) => {
-              for (let i = 0; i < glyph.vertexCount; i++) {
-                const vertexIndex = (glyph.vertexStart + i) * 3;
-                if (vertexIndex >= 0 && vertexIndex < colors.length) {
-                  colors[vertexIndex] = targetColor[0];
-                  colors[vertexIndex + 1] = targetColor[1];
-                  colors[vertexIndex + 2] = targetColor[2];
+        for (const match of byTextMatches) {
+          const targetColor = color.byText[match.pattern];
+          if (!targetColor) continue;
+
+          const matchGlyphs: GlyphGeometryInfo[] = [];
+          const lineIndicesSet = new Set<number>();
+
+          for (let i = match.start; i < match.end; i++) {
+            const glyphs = glyphsByTextIndex.get(i);
+            if (glyphs) {
+              for (const glyph of glyphs) {
+                matchGlyphs.push(glyph);
+                lineIndicesSet.add(glyph.lineIndex);
+                for (let v = 0; v < glyph.vertexCount; v++) {
+                  const vertexIndex = (glyph.vertexStart + v) * 3;
+                  if (vertexIndex >= 0 && vertexIndex < colors.length) {
+                    colors[vertexIndex] = targetColor[0];
+                    colors[vertexIndex + 1] = targetColor[1];
+                    colors[vertexIndex + 2] = targetColor[2];
+                  }
                 }
               }
-            });
-
-            coloredRanges.push({
-              start: range.start,
-              end: range.end,
-              originalText: range.originalText,
-              color: targetColor,
-              bounds: range.bounds,
-              glyphs: range.glyphs,
-              lineIndices: range.lineIndices
-            });
+            }
           }
-        });
+
+          coloredRanges.push({
+            start: match.start,
+            end: match.end,
+            originalText: match.pattern,
+            color: targetColor,
+            bounds: [],
+            glyphs: matchGlyphs,
+            lineIndices: Array.from(lineIndicesSet).sort((a, b) => a - b)
+          });
+        }
       }
 
       // Apply range coloring
@@ -726,7 +749,8 @@ export class Text {
       max: { x: number; y: number; z: number };
     },
     options: TextOptions,
-    originalText?: string
+    originalText?: string,
+    byTextMatches?: { pattern: string; start: number; end: number }[]
   ): TextGeometryInfo {
     const { layout = {} } = options;
     const { width, align = layout.direction === 'rtl' ? 'right' : 'left' } =
@@ -764,7 +788,8 @@ export class Text {
         vertices,
         glyphInfoArray,
         options.color,
-        options.text
+        options.text,
+        byTextMatches
       );
       colors = colorResult.colors;
       coloredRanges = colorResult.coloredRanges;
@@ -790,13 +815,18 @@ export class Text {
         pointsRemovedByColinear: optimizationStats.pointsRemovedByColinear,
         originalPointCount: optimizationStats.originalPointCount
       },
-      query: (options: TextQueryOptions) => {
-        if (!originalText) {
-          throw new Error('Original text not available for querying');
-        }
-        const queryInstance = new TextRangeQuery(originalText, glyphInfoArray);
-        return queryInstance.execute(options);
-      },
+      query: (() => {
+        let cachedQuery: TextRangeQuery | null = null;
+        return (options: TextQueryOptions) => {
+          if (!originalText) {
+            throw new Error('Original text not available for querying');
+          }
+          if (!cachedQuery) {
+            cachedQuery = new TextRangeQuery(originalText, glyphInfoArray);
+          }
+          return cachedQuery.execute(options);
+        };
+      })(),
       coloredRanges,
       glyphAttributes: undefined
     };

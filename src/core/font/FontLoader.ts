@@ -67,7 +67,9 @@ export class FontLoader {
 
       const axisInfos = face.getAxisInfos();
       const isVariable = Object.keys(axisInfos).length > 0;
-      const metrics = FontMetadataExtractor.extractMetadata(fontBuffer);
+
+      const { metrics, features: featureData } =
+        FontMetadataExtractor.extractAll(fontBuffer);
 
       // Merge axis names from STAT table with HarfBuzz axis info
       let variationAxes: { [key: string]: any } | undefined = undefined;
@@ -80,8 +82,6 @@ export class FontLoader {
           };
         }
       }
-
-      const featureData = FontMetadataExtractor.extractFeatureTags(fontBuffer);
 
       return {
         hb,

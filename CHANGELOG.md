@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.2] - 2025-12-27
+
+### Performance
+
+- `FontMetadataExtractor`: Faster font loading via shared table directory parsing, name table indexing, and deferred string conversion
+- `WoffConverter`: Faster WOFF decompression via parallel table decompression
+- `TextShaper`: Char code whitespace check, cached character lookups, cached CJK status between glyph iterations
+- `Text`: Lazy-cached `query()` for faster repeated calls; faster `byCharRange` coloring
+
 ## [0.3.1] - 2025-12-27
 
 ### Breaking changes
