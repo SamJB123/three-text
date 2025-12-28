@@ -694,6 +694,46 @@ describe('Text Library', () => {
       expect(result.coloredRanges!.length).toBeGreaterThan(0);
     });
 
+    it('populates bounds in coloredRanges for collision detection', async () => {
+      await Text.init();
+      const buffer = getFontBuffer();
+
+      const result = await Text.create({
+        text: 'Hello World',
+        font: buffer,
+        size: 72,
+        color: {
+          default: [1, 1, 1],
+          byText: {
+            Hello: [1, 0, 0],
+            World: [0, 1, 0]
+          }
+        }
+      });
+
+      expect(result.coloredRanges).toBeDefined();
+      expect(result.coloredRanges!.length).toBe(2);
+
+      for (const range of result.coloredRanges!) {
+        expect(range.bounds).toBeDefined();
+        expect(Array.isArray(range.bounds)).toBe(true);
+        expect(range.bounds.length).toBeGreaterThan(0);
+
+        for (const bound of range.bounds) {
+          expect(bound.min).toBeDefined();
+          expect(bound.max).toBeDefined();
+          expect(typeof bound.min.x).toBe('number');
+          expect(typeof bound.min.y).toBe('number');
+          expect(typeof bound.min.z).toBe('number');
+          expect(typeof bound.max.x).toBe('number');
+          expect(typeof bound.max.y).toBe('number');
+          expect(typeof bound.max.z).toBe('number');
+          expect(bound.max.x).toBeGreaterThanOrEqual(bound.min.x);
+          expect(bound.max.y).toBeGreaterThanOrEqual(bound.min.y);
+        }
+      }
+    });
+
     it('applies character range coloring', async () => {
       await Text.init();
       const buffer = getFontBuffer();
@@ -713,6 +753,13 @@ describe('Text Library', () => {
 
       expect(result.colors).toBeDefined();
       expect(result.coloredRanges).toBeDefined();
+      expect(result.coloredRanges!.length).toBe(2);
+
+      for (const range of result.coloredRanges!) {
+        expect(range.bounds).toBeDefined();
+        expect(Array.isArray(range.bounds)).toBe(true);
+        expect(range.bounds.length).toBeGreaterThan(0);
+      }
     });
 
     it('returns coloredRanges when coloring is used', async () => {

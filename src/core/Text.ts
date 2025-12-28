@@ -656,8 +656,10 @@ export class Text {
         colors[i + 2] = defaultColor[2];
       }
 
-      if (color.byText && byTextMatches) {
-        const glyphsByTextIndex = new Map<number, GlyphGeometryInfo[]>();
+      // Build glyph index once for both byText and byCharRange
+      let glyphsByTextIndex: Map<number, GlyphGeometryInfo[]> | undefined;
+      if ((color.byText && byTextMatches) || color.byCharRange) {
+        glyphsByTextIndex = new Map();
         for (const glyph of glyphInfoArray) {
           const existing = glyphsByTextIndex.get(glyph.textIndex);
           if (existing) {
@@ -666,20 +668,27 @@ export class Text {
             glyphsByTextIndex.set(glyph.textIndex, [glyph]);
           }
         }
+      }
 
+      if (color.byText && byTextMatches && glyphsByTextIndex) {
         for (const match of byTextMatches) {
           const targetColor = color.byText[match.pattern];
           if (!targetColor) continue;
 
           const matchGlyphs: GlyphGeometryInfo[] = [];
-          const lineIndicesSet = new Set<number>();
+          const lineGroups = new Map<number, GlyphGeometryInfo[]>();
 
           for (let i = match.start; i < match.end; i++) {
             const glyphs = glyphsByTextIndex.get(i);
             if (glyphs) {
               for (const glyph of glyphs) {
                 matchGlyphs.push(glyph);
-                lineIndicesSet.add(glyph.lineIndex);
+                const lineGlyphs = lineGroups.get(glyph.lineIndex);
+                if (lineGlyphs) {
+                  lineGlyphs.push(glyph);
+                } else {
+                  lineGroups.set(glyph.lineIndex, [glyph]);
+                }
                 for (let v = 0; v < glyph.vertexCount; v++) {
                   const vertexIndex = (glyph.vertexStart + v) * 3;
                   if (vertexIndex >= 0 && vertexIndex < colors.length) {
@@ -692,51 +701,104 @@ export class Text {
             }
           }
 
+          // Calculate bounds per line for collision detection
+          const bounds = Array.from(lineGroups.values()).map((lineGlyphs) =>
+            this.calculateGlyphBounds(lineGlyphs)
+          );
+
           coloredRanges.push({
             start: match.start,
             end: match.end,
             originalText: match.pattern,
             color: targetColor,
-            bounds: [],
+            bounds,
             glyphs: matchGlyphs,
-            lineIndices: Array.from(lineIndicesSet).sort((a, b) => a - b)
+            lineIndices: Array.from(lineGroups.keys()).sort((a, b) => a - b)
           });
         }
       }
 
       // Apply range coloring
-      if (color.byCharRange) {
-        color.byCharRange.forEach((range) => {
+      if (color.byCharRange && glyphsByTextIndex) {
+        for (const range of color.byCharRange) {
           const rangeGlyphs: GlyphGeometryInfo[] = [];
+          const lineGroups = new Map<number, GlyphGeometryInfo[]>();
 
-          for (const glyph of glyphInfoArray) {
-            if (glyph.textIndex >= range.start && glyph.textIndex < range.end) {
-              rangeGlyphs.push(glyph);
-              for (let i = 0; i < glyph.vertexCount; i++) {
-                const vertexIndex = (glyph.vertexStart + i) * 3;
-                if (vertexIndex >= 0 && vertexIndex < colors.length) {
-                  colors[vertexIndex] = range.color[0];
-                  colors[vertexIndex + 1] = range.color[1];
-                  colors[vertexIndex + 2] = range.color[2];
+          for (let i = range.start; i < range.end; i++) {
+            const glyphs = glyphsByTextIndex.get(i);
+            if (glyphs) {
+              for (const glyph of glyphs) {
+                rangeGlyphs.push(glyph);
+                const lineGlyphs = lineGroups.get(glyph.lineIndex);
+                if (lineGlyphs) {
+                  lineGlyphs.push(glyph);
+                } else {
+                  lineGroups.set(glyph.lineIndex, [glyph]);
+                }
+                for (let v = 0; v < glyph.vertexCount; v++) {
+                  const vertexIndex = (glyph.vertexStart + v) * 3;
+                  if (vertexIndex >= 0 && vertexIndex < colors.length) {
+                    colors[vertexIndex] = range.color[0];
+                    colors[vertexIndex + 1] = range.color[1];
+                    colors[vertexIndex + 2] = range.color[2];
+                  }
                 }
               }
             }
           }
+
+          // Calculate bounds per line for collision detection
+          const bounds = Array.from(lineGroups.values()).map((lineGlyphs) =>
+            this.calculateGlyphBounds(lineGlyphs)
+          );
 
           coloredRanges.push({
             start: range.start,
             end: range.end,
             originalText: originalText.slice(range.start, range.end),
             color: range.color,
-            bounds: [], // Would calculate from glyphs if needed
+            bounds,
             glyphs: rangeGlyphs,
-            lineIndices: [...new Set(rangeGlyphs.map((g) => g.lineIndex))]
+            lineIndices: Array.from(lineGroups.keys()).sort((a, b) => a - b)
           });
-        });
+        }
       }
     }
 
     return { colors, coloredRanges };
+  }
+
+  private calculateGlyphBounds(glyphs: GlyphGeometryInfo[]): {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  } {
+    if (glyphs.length === 0) {
+      return {
+        min: { x: 0, y: 0, z: 0 },
+        max: { x: 0, y: 0, z: 0 }
+      };
+    }
+
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity;
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity;
+
+    for (const glyph of glyphs) {
+      if (glyph.bounds.min.x < minX) minX = glyph.bounds.min.x;
+      if (glyph.bounds.min.y < minY) minY = glyph.bounds.min.y;
+      if (glyph.bounds.min.z < minZ) minZ = glyph.bounds.min.z;
+      if (glyph.bounds.max.x > maxX) maxX = glyph.bounds.max.x;
+      if (glyph.bounds.max.y > maxY) maxY = glyph.bounds.max.y;
+      if (glyph.bounds.max.z > maxZ) maxZ = glyph.bounds.max.z;
+    }
+
+    return {
+      min: { x: minX, y: minY, z: minZ },
+      max: { x: maxX, y: maxY, z: maxZ }
+    };
   }
 
   private finalizeGeometry(

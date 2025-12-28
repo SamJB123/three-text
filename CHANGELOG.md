@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.3] - 2025-12-27
+
+### Fixed
+
+- `coloredRanges[].bounds` being populated correctly
+
+### Performance
+
+- More `byCharRange` improvements
+
 ## [0.3.2] - 2025-12-27
 
 ### Performance
