@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.4] - 2025-12-30
+
+### Fixed
+
+- `LineBreak`:
+  - Corrected badness formula and node deactivation logic
+  - Fitness class calculation
+
+### Changed
+
+- `scripts/convertPatterns.js`: Extract hyphenmin values from .tex files
+
+### Removed
+
+- `looseness` parameter
+
 ## [0.3.3] - 2025-12-27
 
 ### Fixed
