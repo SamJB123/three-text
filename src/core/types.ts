@@ -329,6 +329,4 @@ export interface LayoutOptions {
   hyphenpenalty?: number;
   exhyphenpenalty?: number;
   doublehyphendemerits?: number;
-  disableShortLineDetection?: boolean;
-  shortLineThreshold?: number;
 }

@@ -547,10 +547,7 @@ export class Text {
       adjdemerits,
       hyphenpenalty,
       exhyphenpenalty,
-      doublehyphendemerits,
-      looseness,
-      disableShortLineDetection,
-      shortLineThreshold
+      doublehyphendemerits
     } = layout;
 
     const fontUnitsPerPixel = this.loadedFont.upem / size;
@@ -592,9 +589,6 @@ export class Text {
       hyphenpenalty,
       exhyphenpenalty,
       doublehyphendemerits,
-      looseness,
-      disableShortLineDetection,
-      shortLineThreshold,
       letterSpacing
     });
 

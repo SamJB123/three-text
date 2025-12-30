@@ -48,8 +48,6 @@ export class TextLayout {
       hyphenpenalty,
       exhyphenpenalty,
       doublehyphendemerits,
-      disableShortLineDetection,
-      shortLineThreshold,
       letterSpacing
     } = options;
 
@@ -78,8 +76,6 @@ export class TextLayout {
         hyphenpenalty,
         exhyphenpenalty,
         doublehyphendemerits,
-        disableShortLineDetection,
-        shortLineThreshold,
         unitsPerEm: this.loadedFont.upem,
         letterSpacing,
         measureText: (textToMeasure: string) =>

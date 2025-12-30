@@ -399,8 +399,6 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 - **tolerance** (800): Maximum badness for the second pass with hyphenation
 - **emergencyStretch** (0): Additional stretchability for difficult paragraphs
 - **autoEmergencyStretch** (0.1): Emergency stretch as percentage of line width (e.g., 0.1 = 10%). Defaults to 10% for non-hyphenated text
-- **disableShortLineDetection** (false): Disable automatic prevention of short lines
-- **shortLineThreshold** (0.7): Width ratio threshold for short line detection (0.0 to 1.0)
 
 #### Advanced parameters
 
@@ -419,23 +417,6 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 - **adjdemerits** (10000): Demerits when adjacent lines have incompatible fitness classes (very tight next to very loose)
 
 Lower penalty/tolerance values produce tighter spacing but may fail to find acceptable breaks for challenging text
-
-#### Short line detection
-
-By default, the library detects and prevents short lines (lines occupying less than 70% of the target width on non-final lines) by iteratively applying emergency stretch. This can be customized or disabled:
-
-```javascript
-const text = await Text.create({
-  text: 'Your text content',
-  font: '/fonts/Font.ttf',
-  layout: {
-    width: 1000,
-    shortLineThreshold: 0.6,  // Only flag lines < 60% width (more lenient)
-    // Or disable entirely:
-    // disableShortLineDetection: true,
-  },
-});
-```
 
 ### Hyphenation
 
@@ -790,8 +771,6 @@ interface LayoutOptions {
   pretolerance?: number; // Maximum badness for first pass (default: 100)
   emergencyStretch?: number; // Additional stretchability for difficult paragraphs
   autoEmergencyStretch?: number; // Emergency stretch as percentage of line width (defaults to 10% for non-hyphenated)
-  disableShortLineDetection?: boolean; // Disable automatic short line prevention (default: false)
-  shortLineThreshold?: number; // Width ratio threshold for short line detection (default: 0.7)
   lefthyphenmin?: number; // Minimum characters before hyphen (default: 2)
   righthyphenmin?: number; // Minimum characters after hyphen (default: 4)
   linepenalty?: number; // Base penalty per line (default: 10)
