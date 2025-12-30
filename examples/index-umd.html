@@ -960,8 +960,6 @@
         linepenalty: 10,
         adjdemerits: 10000,
         respectExistingBreaks: true,
-        disableShortLineDetection: false,
-        shortLineThreshold: 0.7,
         distanceTolerance: 0.5,
         angleTolerance: 0.25,
       };
@@ -1525,14 +1523,6 @@
         lineBreakingFolder
           .add(params, "respectExistingBreaks")
           .name("Respect existing breaks")
-          .onChange(debouncedRender);
-        lineBreakingFolder
-          .add(params, "disableShortLineDetection")
-          .name("Disable short line detection")
-          .onChange(debouncedRender);
-        lineBreakingFolder
-          .add(params, "shortLineThreshold", 0.0, 1.0, 0.05)
-          .name("Short line threshold")
           .onChange(debouncedRender);
         lineBreakingFolder
           .add(params, "tolerance", 10, 10000, 100)
@@ -2171,8 +2161,6 @@
                 pretolerance: params.pretolerance,
                 emergencyStretch: params.emergencyStretch,
                 respectExistingBreaks: params.respectExistingBreaks,
-                disableShortLineDetection: params.disableShortLineDetection,
-                shortLineThreshold: params.shortLineThreshold,
                 lefthyphenmin: params.lefthyphenmin,
                 righthyphenmin: params.righthyphenmin,
                 linepenalty: params.linepenalty,
@@ -2216,8 +2204,6 @@
                 pretolerance: params.pretolerance,
                 emergencyStretch: params.emergencyStretch,
                 respectExistingBreaks: params.respectExistingBreaks,
-                disableShortLineDetection: params.disableShortLineDetection,
-                shortLineThreshold: params.shortLineThreshold,
                 lefthyphenmin: params.lefthyphenmin,
                 righthyphenmin: params.righthyphenmin,
                 linepenalty: params.linepenalty,
