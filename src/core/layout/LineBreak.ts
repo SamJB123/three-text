@@ -1,10 +1,9 @@
-// Based on TeX's line breaking (Knuth, Plass, Liang)
+// Knuth-Plass line breaking algorithm with Liang hyphenation
+// References: tex.web (TeX), linebreak.c (LuaTeX), break.lua (SILE)
 
 import { perfLogger } from '../../utils/PerformanceLogger';
 import { logger } from '../../utils/Logger';
 import {
-  FITNESS_TIGHT_THRESHOLD,
-  FITNESS_NORMAL_THRESHOLD,
   DEFAULT_TOLERANCE,
   DEFAULT_PRETOLERANCE,
   DEFAULT_EMERGENCY_STRETCH,
@@ -20,17 +19,18 @@ import type {
 } from '../types';
 
 export enum ItemType {
-  BOX, // a character or word with a fixed width
-  GLUE, // stretchable space between boxes
-  PENALTY, // potential breakpoint with an associated penalty
-  DISCRETIONARY // discretionary break with pre/post/no-break forms
+  BOX,            // character or word with fixed width
+  GLUE,           // stretchable/shrinkable space
+  PENALTY,        // potential breakpoint with penalty cost
+  DISCRETIONARY   // hyphenation point with pre/post/no-break forms
 }
 
+// TeX fitness classes (tex.web lines 16099-16105)
 export enum FitnessClass {
-  TIGHT = 0,
-  NORMAL = 1,
-  LOOSE = 2,
-  VERY_LOOSE = 3
+  VERY_LOOSE = 0, // lines stretching more than their stretchability
+  LOOSE = 1,      // lines stretching 0.5 to 1.0 of their stretchability
+  DECENT = 2,     // all other lines
+  TIGHT = 3       // lines shrinking 0.5 to 1.0 of their shrinkability
 }
 
 interface Item {
@@ -46,108 +46,94 @@ export interface Box extends Item {
 
 export interface Glue extends Item {
   type: ItemType.GLUE;
-  stretch: number; // amount the space can stretch
-  shrink: number; // amount the space can shrink
+  stretch: number;  // amount the space can grow
+  shrink: number;   // amount the space can compress
 }
 
 export interface Penalty extends Item {
   type: ItemType.PENALTY;
-  penalty: number; // cost of breaking at this point (infinity means no break allowed)
-  flagged?: boolean; // for tracking consecutive hyphenated breaks
+  penalty: number;    // cost of breaking here (10000 = infinity)
+  flagged?: boolean;  // marks consecutive hyphenated lines
 }
 
 export interface Discretionary extends Item {
   type: ItemType.DISCRETIONARY;
-  preBreak: string; // text to insert before break (e.g., hyphen)
-  postBreak: string; // text to insert after break (usually empty)
-  noBreak: string; // text to use if no break occurs (usually empty)
-  preBreakWidth: number; // width of preBreak text
-  penalty: number; // penalty for breaking here
-  flagged?: boolean; // for tracking consecutive hyphenated breaks
+  preBreak: string;       // text before break (e.g., hyphen)
+  postBreak: string;      // text after break (usually empty)
+  noBreak: string;        // text if no break (usually empty)
+  preBreakWidth: number;  // width of preBreak text
+  penalty: number;        // cost of breaking here
+  flagged?: boolean;      // marks consecutive hyphenated lines
 }
 
 interface BreakNode {
-  position: number; // position in the item list
-  line: number; // line number
-  fitness: FitnessClass; // fitness class of this line
-  totalDemerits: number; // total demerits up to this breakpoint
-  totalWidth: number; // total width of content
-  previous: BreakNode | null; // previous break in the solution
-  active: boolean; // whether this node is still active
-  activeListIndex?: number; // position in active list
+  position: number;        // position in item list
+  line: number;            // line number
+  fitness: FitnessClass;   // fitness class of this line
+  totalDemerits: number;   // accumulated demerits from start
+  previous: BreakNode | null;  // previous break in solution
+  hyphenated: boolean;     // whether this line ends with hyphen
+  active: boolean;         // whether node is still viable
+  activeIndex: number;     // index in activeList for O(1) removal
 }
 
-// ActiveNodeList maintains all currently viable breakpoints as we scan through the text
-// Each node represents a potential break with accumulated demerits (total "cost" from start)
-//
-// Demerits = cumulative penalty score from text start to this break, calculated as:
-//   (line_penalty + badness)² + penalty² + flagged/fitness adjustments (tex.web line 16634)
-// Lower demerits = better line breaks. TeX minimizes total demerits across the paragraph
-//
-// Implementation differs from TeX:
-// - Hash map for O(1) lookups by position+fitness
-// - Separate array containing only active nodes
-// - Each node tracks its array index for swap-and-pop removal
-
+// Fast active node management with O(1) operations
 class ActiveNodeList {
-  private nodesByKey: Map<number, BreakNode>;
-  private activeList: BreakNode[];
-  private allNodes: Set<BreakNode>;
-
-  constructor() {
-    this.nodesByKey = new Map();
-    this.activeList = [];
-    this.allNodes = new Set();
-  }
+  private nodesByKey: Map<number, BreakNode> = new Map();
+  private activeList: BreakNode[] = [];
 
   private getKey(position: number, fitness: FitnessClass): number {
     return (position << 2) | fitness;
   }
 
-  insert(node: BreakNode): void {
+  // Insert or update node - returns true if node was added/updated
+  insert(node: BreakNode): boolean {
     const key = this.getKey(node.position, node.fitness);
     const existing = this.nodesByKey.get(key);
 
-    if (existing && node.totalDemerits < existing.totalDemerits) {
+    if (existing) {
+      // Update existing if new one is better
+      if (node.totalDemerits < existing.totalDemerits) {
       existing.totalDemerits = node.totalDemerits;
       existing.previous = node.previous;
-      existing.totalWidth = node.totalWidth;
-    } else if (!existing) {
-      this.nodesByKey.set(key, node);
-      this.allNodes.add(node);
-      node.activeListIndex = this.activeList.length;
-      this.activeList.push(node);
+        existing.hyphenated = node.hyphenated;
+        existing.line = node.line;
+        return true;
+      }
+      return false;
     }
-  }
 
-  findExisting(position: number, fitness: FitnessClass): BreakNode | undefined {
-    return this.nodesByKey.get(this.getKey(position, fitness));
-  }
-
-  getAllActive(): BreakNode[] {
-    return this.activeList;
+    // Add new node
+    node.active = true;
+    node.activeIndex = this.activeList.length;
+    this.activeList.push(node);
+    this.nodesByKey.set(key, node);
+    return true;
   }
 
   // Swap-and-pop removal
-  deactivateNode(node: BreakNode): void {
-    if (node.active && node.activeListIndex !== undefined) {
+  deactivate(node: BreakNode): void {
+    if (!node.active) return;
       node.active = false;
-      const idx = node.activeListIndex;
-      const last = this.activeList.length - 1;
 
-      if (idx !== last) {
-        const lastNode = this.activeList[last];
+    const idx = node.activeIndex;
+    const lastIdx = this.activeList.length - 1;
+
+    if (idx !== lastIdx) {
+      const lastNode = this.activeList[lastIdx];
         this.activeList[idx] = lastNode;
-        lastNode.activeListIndex = idx;
+      lastNode.activeIndex = idx;
       }
 
       this.activeList.pop();
-      node.activeListIndex = undefined;
     }
+
+  getActive(): BreakNode[] {
+    return this.activeList;
   }
 
   size(): number {
-    return this.allNodes.size;
+    return this.activeList.length;
   }
 }
 
@@ -159,108 +145,106 @@ export interface LineBreakOptions {
   hyphenate?: boolean;
   language?: string;
   measureText: (text: string) => number;
-  // Optional batched measurement aligned with Array.from(text)
   measureTextWidths?: (text: string) => number[];
   respectExistingBreaks?: boolean;
   hyphenationPatterns?: HyphenationPatternsMap;
   unitsPerEm?: number;
-  // Letter spacing as a fraction of em. Used to correct trailing spacing at line ends because
-  // measureText() includes trailing spacing for token composability
   letterSpacing?: number;
-
-  // Max badness with hyphenation in second pass (TeX default: 800)
   tolerance?: number;
-
-  // Max badness without hyphenation in first pass (TeX default: 100)
   pretolerance?: number;
-
-  // Extra stretchability added in the emergency pass when no good breaks found (TeX's default: 0)
   emergencyStretch?: number;
-
-  // Auto-calculate emergency stretch as percentage of line width (e.g., 0.1 = 10%)
-  // When set, overrides emergencyStretch. Defaults to 10% for non-hyphenated text
   autoEmergencyStretch?: number;
-
-  // TeX hyphenation minimums (\lefthyphenmin and \righthyphenmin)
-  lefthyphenmin?: number; // min characters before hyphen
-  righthyphenmin?: number; // min characters after hyphen
-
-  // Penalties and demerits
-  linepenalty?: number; // added to every line's badness before squaring
-  adjdemerits?: number; // demerits when fitness classes differ by >1
-  hyphenpenalty?: number; // penalty at automatic hyphenation points
-  exhyphenpenalty?: number; // penalty at explicit hyphen characters
-  doublehyphendemerits?: number; // demerits for consecutive hyphenated breaks
-
-  // Looseness: adjust paragraph length by n lines
-  looseness?: number;
-
-  // Disable automatic detection and prevention of short lines
-  // When enabled (default), iteratively applies emergency stretch to eliminate
-  // lines that are less than 50% of the target width
-  disableShortLineDetection?: boolean;
-
-  // Threshold for short line detection (0.0 to 1.0, default: 0.5)
-  // Lines with width less than this ratio of the target width are considered problematic
-  // and will trigger additional emergency stretch to push words to the next line
-  shortLineThreshold?: number;
+  lefthyphenmin?: number;
+  righthyphenmin?: number;
+  linepenalty?: number;
+  adjdemerits?: number;
+  hyphenpenalty?: number;
+  exhyphenpenalty?: number;
+  doublehyphendemerits?: number;
+  finalhyphendemerits?: number;
 }
 
 interface LineBreakContext {
   linePenalty: number;
   adjDemerits: number;
   doubleHyphenDemerits: number;
+  finalHyphenDemerits: number;
   hyphenPenalty: number;
   exHyphenPenalty: number;
   currentAlign: TextAlign;
   unitsPerEm?: number;
-  // Letter spacing in font units used to correct trailing spacing at line ends
   letterSpacingFU?: number;
 }
 
-// TeX defaults
-const DEFAULT_HYPHEN_PENALTY = 50;
-const DEFAULT_EX_HYPHEN_PENALTY = 50;
-const DEFAULT_DOUBLE_HYPHEN_DEMERITS = 10000;
-const DEFAULT_LINE_PENALTY = 10;
-const DEFAULT_FITNESS_DIFF_DEMERITS = 10000;
+// TeX parameters (tex.web lines 4934-4936, 4997-4999)
+const DEFAULT_HYPHEN_PENALTY = 50;        // \hyphenpenalty
+const DEFAULT_EX_HYPHEN_PENALTY = 50;     // \exhyphenpenalty
+const DEFAULT_DOUBLE_HYPHEN_DEMERITS = 10000; // \doublehyphendemerits
+const DEFAULT_FINAL_HYPHEN_DEMERITS = 5000;   // \finalhyphendemerits
+const DEFAULT_LINE_PENALTY = 10;          // \linepenalty
+const DEFAULT_FITNESS_DIFF_DEMERITS = 10000;  // \adjdemerits
+const DEFAULT_LEFT_HYPHEN_MIN = 2;        // \lefthyphenmin
+const DEFAULT_RIGHT_HYPHEN_MIN = 3;       // \righthyphenmin
 
-const FORCED_BREAK = -Infinity;
+// TeX special values (tex.web lines 2335, 3258, 3259)
+const INF_BAD = 10000;           // inf_bad - infinitely bad badness
+const INFINITY_PENALTY = 10000;  // inf_penalty - never break here
+const EJECT_PENALTY = -10000;    // eject_penalty - force break here
 
-const DEFAULT_LEFT_HYPHEN_MIN = 2;
-const DEFAULT_RIGHT_HYPHEN_MIN = 4;
+// Retry increment when no breakpoints found
+const EMERGENCY_STRETCH_INCREMENT = 0.1;
 
-const INF_BAD = 10000;
-
-// Non TeX default: emergency stretch for non-hyphenated text (10% of line width)
-const DEFAULT_EMERGENCY_STRETCH_NO_HYPHEN = 0.1;
-
-// Another non TeX default: Short line detection thresholds
-const SHORT_LINE_WIDTH_THRESHOLD = 0.7; // Lines < 70% of width are problematic
-const SHORT_LINE_EMERGENCY_STRETCH_INCREMENT = 0.1; // Add 10% per iteration
+// Cumulative sums of width/stretch/shrink up to each item index.
+// To get the total width between items[a] and items[b], compute:
+//   cumulative.width[b] - cumulative.width[a]
+// This avoids re-summing items every time we evaluate a potential line break
+interface CumulativeWidths {
+  width: Float64Array;
+  stretch: Float64Array;
+  shrink: Float64Array;
+}
 
 export class LineBreak {
-  // Calculate badness according to TeX's formula (tex.web line 2337)
-  // Given t (desired adjustment) and s (available stretch/shrink)
-  // Returns approximation to 100(t/s)³, representing how "bad" a line is
-  // Constants are derived from TeX's fixed-point arithmetic:
-  // 297³ ≈ 100×2¹⁸, so (297t/s)³/2¹⁸ ≈ 100(t/s)³
+  // TeX: badness function (tex.web lines 2337-2348)
+  // Computes badness = 100 * (t/s)³ where t=adjustment, s=stretchability
   private static badness(t: number, s: number): number {
     if (t === 0) return 0;
-    if (s <= 0) return INF_BAD;
+    if (s <= 0) return INF_BAD + 1;
+    const r = Math.abs(t) / s;
+    if (r > 10) return INF_BAD + 1;
+    return Math.min(Math.round(100 * r * r * r), INF_BAD);
+  }
 
-    let r: number;
-    if (t <= 7230584) {
-      r = Math.floor((t * 297) / s);
-    } else if (s >= 1663497) {
-      r = Math.floor(t / Math.floor(s / 297));
-    } else {
-      r = t;
+  // TeX fitness classification (tex.web lines 16796-16812)
+  private static fitnessClass(ratio: number): FitnessClass {
+    if (ratio < -0.5) return FitnessClass.TIGHT;      // shrinking significantly
+    if (ratio < 0.5) return FitnessClass.DECENT;      // normal
+    if (ratio < 1) return FitnessClass.LOOSE;         // stretching 0.5-1.0
+    return FitnessClass.VERY_LOOSE;                   // stretching > 1.0
+  }
+
+  // Build prefix sums so we can quickly compute the width/stretch/shrink
+  // of any range [a, b] as cumulative[b] - cumulative[a]
+  private static computeCumulativeWidths(items: Item[]): CumulativeWidths {
+    const n = items.length + 1;
+    const width = new Float64Array(n);
+    const stretch = new Float64Array(n);
+    const shrink = new Float64Array(n);
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      width[i + 1] = width[i] + item.width;
+
+      if (item.type === ItemType.GLUE) {
+        stretch[i + 1] = stretch[i] + (item as Glue).stretch;
+        shrink[i + 1] = shrink[i] + (item as Glue).shrink;
+      } else {
+        stretch[i + 1] = stretch[i];
+        shrink[i + 1] = shrink[i];
+      }
     }
 
-    if (r > 1290) return INF_BAD;
-
-    return Math.floor((r * r * r + 131072) / 262144);
+    return { width, stretch, shrink };
   }
 
   public static findHyphenationPoints(
@@ -308,18 +292,14 @@ export class LineBreak {
       }
     }
 
-    const filteredPoints = hyphenPoints.filter(
+    return hyphenPoints.filter(
       (pos) => pos >= lefthyphenmin && word.length - pos >= righthyphenmin
     );
-
-    return filteredPoints;
   }
 
-  // Converts text into items (boxes, glues, penalties) for line breaking
-  // The measureText function should return widths that include any letter spacing
   public static itemizeText(
     text: string,
-    measureText: (text: string) => number, // function to measure text width
+    measureText: (text: string) => number,
     measureTextWidths: ((text: string) => number[]) | undefined,
     hyphenate: boolean = false,
     language: string = 'en-us',
@@ -344,12 +324,11 @@ export class LineBreak {
       )
     );
 
-    // Final glue and penalty to end the paragraph
-    // Use infinite stretch to fill the last line
+    // Final glue and penalty
     items.push({
       type: ItemType.GLUE,
       width: 0,
-      stretch: Infinity,
+      stretch: 10000000,
       shrink: 0,
       text: '',
       originIndex: text.length
@@ -357,7 +336,7 @@ export class LineBreak {
     items.push({
       type: ItemType.PENALTY,
       width: 0,
-      penalty: -Infinity,
+      penalty: EJECT_PENALTY,
       text: '',
       originIndex: text.length
     } as Penalty);
@@ -365,100 +344,54 @@ export class LineBreak {
     return items;
   }
 
-  // Chinese, Japanese, and Korean character ranges
   public static isCJK(char: string): boolean {
     const code = char.codePointAt(0);
     if (code === undefined) return false;
 
     return (
-      // CJK Unified Ideographs
       (code >= 0x4e00 && code <= 0x9fff) ||
-      // CJK Extension A
       (code >= 0x3400 && code <= 0x4dbf) ||
-      // CJK Extension B
       (code >= 0x20000 && code <= 0x2a6df) ||
-      // CJK Extension C
       (code >= 0x2a700 && code <= 0x2b73f) ||
-      // CJK Extension D
       (code >= 0x2b740 && code <= 0x2b81f) ||
-      // CJK Extension E
       (code >= 0x2b820 && code <= 0x2ceaf) ||
-      // CJK Compatibility Ideographs
       (code >= 0xf900 && code <= 0xfaff) ||
-      // Hiragana
       (code >= 0x3040 && code <= 0x309f) ||
-      // Katakana
       (code >= 0x30a0 && code <= 0x30ff) ||
-      // Hangul Syllables
       (code >= 0xac00 && code <= 0xd7af) ||
-      // Hangul Jamo
       (code >= 0x1100 && code <= 0x11ff) ||
-      // Hangul Compatibility Jamo
       (code >= 0x3130 && code <= 0x318f) ||
-      // Hangul Jamo Extended-A
       (code >= 0xa960 && code <= 0xa97f) ||
-      // Hangul Jamo Extended-B
       (code >= 0xd7b0 && code <= 0xd7ff) ||
-      // Halfwidth and Fullwidth Forms (Korean)
       (code >= 0xffa0 && code <= 0xffdc)
     );
   }
 
-  // Closing punctuation where line breaks are prohibited (UAX #14 LB30, JIS X 4051)
   public static isCJClosingPunctuation(char: string): boolean {
     const code = char.charCodeAt(0);
     return (
-      code === 0x3001 || // 、
-      code === 0x3002 || // 。
-      code === 0xff0c || // ，
-      code === 0xff0e || // ．
-      code === 0xff1a || // ：
-      code === 0xff1b || // ；
-      code === 0xff01 || // ！
-      code === 0xff1f || // ？
-      code === 0xff09 || // ）
-      code === 0x3011 || // 】
-      code === 0xff5d || // ｝
-      code === 0x300d || // 」
-      code === 0x300f || // 』
-      code === 0x3009 || // 〉
-      code === 0x300b || // 》
-      code === 0x3015 || // 〕
-      code === 0x3017 || // 〗
-      code === 0x3019 || // 〙
-      code === 0x301b || // 〛
-      code === 0x30fc || // ー
-      code === 0x2014 || // —
-      code === 0x2026 || // …
-      code === 0x2025 // ‥
+      code === 0x3001 || code === 0x3002 || code === 0xff0c || code === 0xff0e ||
+      code === 0xff1a || code === 0xff1b || code === 0xff01 || code === 0xff1f ||
+      code === 0xff09 || code === 0x3011 || code === 0xff5d || code === 0x300d ||
+      code === 0x300f || code === 0x3009 || code === 0x300b || code === 0x3015 ||
+      code === 0x3017 || code === 0x3019 || code === 0x301b || code === 0x30fc ||
+      code === 0x2014 || code === 0x2026 || code === 0x2025
     );
   }
 
-  // Opening punctuation where line breaks are prohibited (UAX #14 LB30a, JIS X 4051)
   public static isCJOpeningPunctuation(char: string): boolean {
     const code = char.charCodeAt(0);
     return (
-      code === 0xff08 || // （
-      code === 0x3010 || // 【
-      code === 0xff5b || // ｛
-      code === 0x300c || // 「
-      code === 0x300e || // 『
-      code === 0x3008 || // 〈
-      code === 0x300a || // 《
-      code === 0x3014 || // 〔
-      code === 0x3016 || // 〖
-      code === 0x3018 || // 〘
-      code === 0x301a // 〚
+      code === 0xff08 || code === 0x3010 || code === 0xff5b || code === 0x300c ||
+      code === 0x300e || code === 0x3008 || code === 0x300a || code === 0x3014 ||
+      code === 0x3016 || code === 0x3018 || code === 0x301a
     );
   }
 
   public static isCJPunctuation(char: string): boolean {
-    return (
-      this.isCJClosingPunctuation(char) || this.isCJOpeningPunctuation(char)
-    );
+    return this.isCJClosingPunctuation(char) || this.isCJOpeningPunctuation(char);
   }
 
-  // CJK (Chinese/Japanese/Korean) character-level itemization with inter-character glue
   private static itemizeCJKText(
     text: string,
     measureText: (text: string) => number,
@@ -472,10 +405,7 @@ export class LineBreak {
     const widths = measureTextWidths ? measureTextWidths(text) : null;
     let textPosition = startOffset;
 
-    // Inter-character glue parameters
-    let glueWidth: number;
-    let glueStretch: number;
-    let glueShrink: number;
+    let glueWidth: number, glueStretch: number, glueShrink: number;
 
     if (glueParams) {
       glueWidth = glueParams.width;
@@ -493,9 +423,7 @@ export class LineBreak {
       const nextChar = i < chars.length - 1 ? chars[i + 1] : null;
 
       if (/\s/.test(char)) {
-        const width = widths
-          ? (widths[i] ?? measureText(char))
-          : measureText(char);
+        const width = widths ? (widths[i] ?? measureText(char)) : measureText(char);
         items.push({
           type: ItemType.GLUE,
           width,
@@ -517,22 +445,11 @@ export class LineBreak {
 
       textPosition += char.length;
 
-      // Glue after a box creates a break opportunity
-      // Must not add glue where breaks are prohibited by Chinese/Japanese line breaking rules
       if (nextChar && !/\s/.test(nextChar)) {
         let canBreak = true;
-
-        if (this.isCJClosingPunctuation(nextChar)) {
-          canBreak = false;
-        }
-
-        if (this.isCJOpeningPunctuation(char)) {
-          canBreak = false;
-        }
-
-        // Avoid stretch between consecutive punctuation (？" or 。」)
-        const isPunctPair =
-          this.isCJPunctuation(char) && this.isCJPunctuation(nextChar);
+        if (this.isCJClosingPunctuation(nextChar)) canBreak = false;
+        if (this.isCJOpeningPunctuation(char)) canBreak = false;
+        const isPunctPair = this.isCJPunctuation(char) && this.isCJPunctuation(nextChar);
 
         if (canBreak && !isPunctPair) {
           items.push({
@@ -564,18 +481,11 @@ export class LineBreak {
     const items: Item[] = [];
     const chars = Array.from(text);
 
-    // Calculate CJK glue parameters lazily and once for consistency across all segments
-    let cjkGlueParams:
-      | { width: number; stretch: number; shrink: number }
-      | undefined;
+    let cjkGlueParams: { width: number; stretch: number; shrink: number } | undefined;
     const getCjkGlueParams = () => {
       if (!cjkGlueParams) {
         const baseCharWidth = measureText('字');
-        cjkGlueParams = {
-          width: 0,
-          stretch: baseCharWidth * 0.04,
-          shrink: baseCharWidth * 0.04
-        };
+        cjkGlueParams = { width: 0, stretch: baseCharWidth * 0.04, shrink: baseCharWidth * 0.04 };
       }
       return cjkGlueParams;
     };
@@ -589,28 +499,9 @@ export class LineBreak {
       if (buffer.length === 0) return;
 
       if (bufferScript === 'cjk') {
-        const cjkItems = this.itemizeCJKText(
-          buffer,
-          measureText,
-          measureTextWidths,
-          context,
-          bufferStart,
-          getCjkGlueParams()
-        );
-        items.push(...cjkItems);
+        items.push(...this.itemizeCJKText(buffer, measureText, measureTextWidths, context, bufferStart, getCjkGlueParams()));
       } else {
-        const wordItems = this.itemizeWordBased(
-          buffer,
-          bufferStart,
-          measureText,
-          hyphenate,
-          language,
-          availablePatterns,
-          lefthyphenmin,
-          righthyphenmin,
-          context
-        );
-        items.push(...wordItems);
+        items.push(...this.itemizeWordBased(buffer, bufferStart, measureText, hyphenate, language, availablePatterns, lefthyphenmin, righthyphenmin, context));
       }
 
       buffer = '';
@@ -640,7 +531,6 @@ export class LineBreak {
     return items;
   }
 
-  // Word-based itemization for alphabetic scripts (Latin, Cyrillic, Greek, etc.)
   private static itemizeWordBased(
     text: string,
     startOffset: number,
@@ -656,8 +546,7 @@ export class LineBreak {
     const tokens = text.match(/\S+|\s+/g) || [];
     let currentIndex = 0;
 
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
+    for (const token of tokens) {
       const tokenStartIndex = startOffset + currentIndex;
 
       if (/\s+/.test(token)) {
@@ -675,8 +564,7 @@ export class LineBreak {
         const segments = token.split(/(-)/);
         let segmentIndex = tokenStartIndex;
 
-        for (let j = 0; j < segments.length; j++) {
-          const segment = segments[j];
+        for (const segment of segments) {
           if (!segment) continue;
 
           if (segment === '-') {
@@ -693,12 +581,11 @@ export class LineBreak {
               originIndex: segmentIndex
             } as Discretionary);
             segmentIndex += 1;
-          } else {
-            if (segment.includes('\u00AD')) {
-              const partsWithMarkers = segment.split('\u00AD');
+          } else if (segment.includes('\u00AD')) {
+            const parts = segment.split('\u00AD');
               let runningIndex = 0;
-              for (let k = 0; k < partsWithMarkers.length; k++) {
-                const partText = partsWithMarkers[k];
+            for (let k = 0; k < parts.length; k++) {
+              const partText = parts[k];
                 if (partText.length > 0) {
                   items.push({
                     type: ItemType.BOX,
@@ -708,7 +595,7 @@ export class LineBreak {
                   } as Box);
                   runningIndex += partText.length;
                 }
-                if (k < partsWithMarkers.length - 1) {
+              if (k < parts.length - 1) {
                   items.push({
                     type: ItemType.DISCRETIONARY,
                     width: 0,
@@ -724,18 +611,8 @@ export class LineBreak {
                   runningIndex += 1;
                 }
               }
-            } else if (
-              hyphenate &&
-              segment.length >= lefthyphenmin + righthyphenmin &&
-              /^\p{L}+$/u.test(segment)
-            ) {
-              const hyphenPoints = LineBreak.findHyphenationPoints(
-                segment,
-                language,
-                availablePatterns,
-                lefthyphenmin,
-                righthyphenmin
-              );
+          } else if (hyphenate && segment.length >= lefthyphenmin + righthyphenmin && /^\p{L}+$/u.test(segment)) {
+            const hyphenPoints = this.findHyphenationPoints(segment, language, availablePatterns, lefthyphenmin, righthyphenmin);
 
               if (hyphenPoints.length > 0) {
                 let lastPoint = 0;
@@ -761,11 +638,10 @@ export class LineBreak {
                   } as Discretionary);
                   lastPoint = point;
                 }
-                const lastPart = segment.substring(lastPoint);
                 items.push({
                   type: ItemType.BOX,
-                  width: measureText(lastPart),
-                  text: lastPart,
+                width: measureText(segment.substring(lastPoint)),
+                text: segment.substring(lastPoint),
                   originIndex: segmentIndex + lastPoint
                 } as Box);
               } else {
@@ -785,7 +661,6 @@ export class LineBreak {
               } as Box);
             }
             segmentIndex += segment.length;
-          }
         }
         currentIndex += token.length;
       }
@@ -793,40 +668,188 @@ export class LineBreak {
     return items;
   }
 
-  // Detect if breakpoints create problematic short lines
-  private static hasShortLines(
+  // TeX: line_break inner loop (tex.web lines 16169-17256)
+  // Finds optimal breakpoints using Knuth-Plass algorithm
+  private static lineBreak(
     items: Item[],
-    breakpoints: number[],
     lineWidth: number,
-    threshold: number
-  ): boolean {
-    // Check each line segment (except the last, which can naturally be short)
-    let lineStart = 0;
+    threshold: number,
+    emergencyStretch: number,
+    context: LineBreakContext
+  ): BreakNode | null {
+    const cumulative = this.computeCumulativeWidths(items);
+    const activeNodes = new ActiveNodeList();
 
-    for (let i = 0; i < breakpoints.length - 1; i++) {
-      const breakpoint = breakpoints[i];
-      let totalWidth = 0;
+    // Start node
+    activeNodes.insert({
+      position: 0,
+      line: 0,
+      fitness: FitnessClass.DECENT,
+      totalDemerits: 0,
+      previous: null,
+      hyphenated: false,
+      active: true,
+      activeIndex: 0
+    });
 
-      for (let j = lineStart; j < breakpoint; j++) {
-        if (items[j].type !== ItemType.PENALTY) {
-          totalWidth += items[j].width;
+    // Process each item
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      // Check if this is a legal breakpoint
+      const isBreakpoint =
+        (item.type === ItemType.PENALTY && (item as Penalty).penalty < INFINITY_PENALTY) ||
+        (item.type === ItemType.DISCRETIONARY) ||
+        (item.type === ItemType.GLUE && i > 0 && items[i - 1].type === ItemType.BOX);
+
+      if (!isBreakpoint) continue;
+
+      // Get penalty and flagged status
+      let pi = 0;
+      let flagged = false;
+      if (item.type === ItemType.PENALTY) {
+        pi = (item as Penalty).penalty;
+        flagged = (item as Penalty).flagged || false;
+      } else if (item.type === ItemType.DISCRETIONARY) {
+        pi = (item as Discretionary).penalty;
+        flagged = (item as Discretionary).flagged || false;
+      }
+
+      // Width added at break
+      let breakWidth = 0;
+      if (item.type === ItemType.DISCRETIONARY) {
+        breakWidth = (item as Discretionary).preBreakWidth;
+      }
+
+      // Best for each fitness class
+      const bestNode: (BreakNode | null)[] = [null, null, null, null];
+      const bestDemerits = [Infinity, Infinity, Infinity, Infinity];
+
+      // Nodes to deactivate
+      const toDeactivate: BreakNode[] = [];
+
+      // Current cumulative values at position i
+      const curWidth = cumulative.width[i];
+      const curStretch = cumulative.stretch[i];
+      const curShrink = cumulative.shrink[i];
+
+      // Try each active node as predecessor
+      const active = activeNodes.getActive();
+      for (let j = 0; j < active.length; j++) {
+        const a = active[j];
+
+        // Line width from a to i using cumulative arrays
+        const lineW = curWidth - cumulative.width[a.position] + breakWidth;
+        const lineStretch = curStretch - cumulative.stretch[a.position];
+        const lineShrink = curShrink - cumulative.shrink[a.position];
+
+        const shortfall = lineWidth - lineW;
+        let ratio: number;
+
+        if (shortfall > 0) {
+          const effectiveStretch = lineStretch + emergencyStretch;
+          ratio = effectiveStretch > 0 ? shortfall / effectiveStretch : Infinity;
+        } else if (shortfall < 0) {
+          ratio = lineShrink > 0 ? shortfall / lineShrink : -Infinity;
+        } else {
+          ratio = 0;
+        }
+
+        // Calculate badness
+        const bad = this.badness(shortfall, shortfall > 0 ? lineStretch + emergencyStretch : lineShrink);
+
+        // Check feasibility - THIS IS THE KEY FIX: compare bad vs threshold, not ratio
+        if (ratio < -1) {
+          toDeactivate.push(a);
+          continue;
+        }
+
+        if (pi !== EJECT_PENALTY && bad > threshold) {
+          continue;
+        }
+
+        // Calculate demerits
+        let demerits = context.linePenalty + bad;
+        if (Math.abs(demerits) >= 10000) {
+          demerits = 100000000;
+        } else {
+          demerits = demerits * demerits;
+        }
+
+        if (pi > 0) {
+          demerits += pi * pi;
+        } else if (pi > EJECT_PENALTY) {
+          demerits -= pi * pi;
+        }
+
+        if (flagged && a.hyphenated) {
+          demerits += context.doubleHyphenDemerits;
+        }
+
+        const fitness = this.fitnessClass(ratio);
+
+        if (Math.abs(fitness - a.fitness) > 1) {
+          demerits += context.adjDemerits;
+        }
+
+        const totalDemerits = a.totalDemerits + demerits;
+
+        if (totalDemerits < bestDemerits[fitness]) {
+          bestDemerits[fitness] = totalDemerits;
+          bestNode[fitness] = {
+            position: i,
+            line: a.line + 1,
+            fitness,
+            totalDemerits,
+            previous: a,
+            hyphenated: flagged,
+            active: true,
+            activeIndex: -1
+          };
         }
       }
 
-      // Check if line is narrow relative to target width
-      if (totalWidth > 0) {
-        const widthRatio = totalWidth / lineWidth;
-        if (widthRatio < threshold) {
-          return true;
+      // Deactivate nodes
+      for (const node of toDeactivate) {
+        activeNodes.deactivate(node);
+      }
+
+      // Insert best nodes
+      for (let f = 0; f < 4; f++) {
+        if (bestNode[f]) {
+          activeNodes.insert(bestNode[f]!);
         }
       }
 
-      lineStart = breakpoint + 1;
+      if (activeNodes.size() === 0 && pi !== EJECT_PENALTY) {
+        return null;
+      }
     }
-    return false;
+
+    // Find best solution
+    let best: BreakNode | null = null;
+    let bestTotal = Infinity;
+
+    for (const node of activeNodes.getActive()) {
+      if (node.totalDemerits < bestTotal) {
+        bestTotal = node.totalDemerits;
+        best = node;
+      }
+    }
+
+    return best;
   }
 
+  // Main entry point for line breaking
+  // Implements the multi-pass approach similar to TeX's line_break (tex.web lines 16054-17067)
+  // 1. First pass without hyphenation (pretolerance)
+  // 2. Second pass with hyphenation (tolerance)
+  // 3. Emergency stretch passes with increasing stretchability
   public static breakText(options: LineBreakOptions): LineInfo[] {
+    if (!options.text || options.text.length === 0) {
+      return [];
+    }
+
     perfLogger.start('LineBreak.breakText', {
       textLength: options.text.length,
       width: options.width,
@@ -858,12 +881,10 @@ export class LineBreak {
       hyphenpenalty = DEFAULT_HYPHEN_PENALTY,
       exhyphenpenalty = DEFAULT_EX_HYPHEN_PENALTY,
       doublehyphendemerits = DEFAULT_DOUBLE_HYPHEN_DEMERITS,
-      looseness = 0,
-      disableShortLineDetection = false,
-      shortLineThreshold = SHORT_LINE_WIDTH_THRESHOLD
+      finalhyphendemerits = DEFAULT_FINAL_HYPHEN_DEMERITS
     } = options;
 
-    // Handle multiple paragraphs by processing each independently
+    // Handle multiple paragraphs
     if (respectExistingBreaks && text.includes('\n')) {
       const paragraphs = text.split('\n');
       const allLines: LineInfo[] = [];
@@ -871,7 +892,6 @@ export class LineBreak {
 
       for (const paragraph of paragraphs) {
         if (paragraph.length === 0) {
-          // Add an empty line for empty paragraphs
           allLines.push({
             text: '',
             originalStart: currentOriginOffset,
@@ -882,8 +902,7 @@ export class LineBreak {
             endedWithHyphen: false
           });
         } else {
-          // Process paragraph independently
-          const paragraphLines = LineBreak.breakText({
+          const paragraphLines = this.breakText({
             ...options,
             text: paragraph,
             respectExistingBreaks: false
@@ -905,47 +924,32 @@ export class LineBreak {
     }
 
     let useHyphenation = hyphenate;
-    if (
-      useHyphenation &&
-      (!hyphenationPatterns || !hyphenationPatterns[language])
-    ) {
+    if (useHyphenation && (!hyphenationPatterns || !hyphenationPatterns[language])) {
       logger.warn(`Hyphenation patterns for ${language} not available`);
       useHyphenation = false;
     }
 
-    // Calculate initial emergency stretch (TeX default: 0)
     let initialEmergencyStretch = emergencyStretch;
     if (autoEmergencyStretch !== undefined && width) {
-      // autoEmergencyStretch overrides everything
       initialEmergencyStretch = width * autoEmergencyStretch;
-    } else if (
-      !useHyphenation &&
-      emergencyStretch === DEFAULT_EMERGENCY_STRETCH &&
-      width
-    ) {
-      // Default: non-hyphenated text gets 10% (has fewer breakpoints)
-      initialEmergencyStretch = width * DEFAULT_EMERGENCY_STRETCH_NO_HYPHEN;
     }
 
     const context: LineBreakContext = {
       linePenalty: linepenalty,
       adjDemerits: adjdemerits,
       doubleHyphenDemerits: doublehyphendemerits,
+      finalHyphenDemerits: finalhyphendemerits,
       hyphenPenalty: hyphenpenalty,
       exHyphenPenalty: exhyphenpenalty,
       currentAlign: align,
       unitsPerEm,
-      // measureText() includes trailing letter spacing after the final glyph of a token
-      // Shaping applies letter spacing only between glyphs, so we subtract one
-      // trailing letterSpacingFU per line segment (see computeAdjustmentRatio/createLines)
       letterSpacingFU: unitsPerEm ? letterSpacing * unitsPerEm : 0
     };
 
     if (!width || width === Infinity) {
       const measuredWidth = measureText(text);
       perfLogger.end('LineBreak.breakText');
-      return [
-        {
+      return [{
           text,
           originalStart: 0,
           originalEnd: text.length - 1,
@@ -953,711 +957,76 @@ export class LineBreak {
           isLastLine: true,
           naturalWidth: measuredWidth,
           endedWithHyphen: false
-        }
-      ];
+      }];
     }
 
-    // Itemize without hyphenation first (TeX approach: only compute if needed)
-    const allItems = LineBreak.itemizeText(
-      text,
-      measureText,
-      measureTextWidths,
-      false,
-      language,
-      hyphenationPatterns,
-      lefthyphenmin,
-      righthyphenmin,
-      context
-    );
+    // First pass: without hyphenation
+    let items = this.itemizeText(text, measureText, measureTextWidths, false, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context);
+    let best = this.lineBreak(items, width, pretolerance, 0, context);
 
-    if (allItems.length === 0) {
-      return [];
+    // Second pass: with hyphenation
+    if (!best && useHyphenation) {
+      items = this.itemizeText(text, measureText, measureTextWidths, true, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context);
+      best = this.lineBreak(items, width, tolerance, 0, context);
     }
 
-    const MAX_ITERATIONS = 5;
-    let iteration = 0;
-    let currentEmergencyStretch = initialEmergencyStretch;
-    let resultLines: LineInfo[] | null = null;
-    const shortLineDetectionEnabled = !disableShortLineDetection;
-
-    while (iteration < MAX_ITERATIONS) {
-      // Three-pass approach matching TeX:
-      // First pass: without hyphenation (pretolerance)
-      // Second pass: with hyphenation, only if first pass fails (tolerance)
-      // Emergency pass: additional stretch as last resort
-
-      // First pass: no hyphenation
-      let currentItems = allItems;
-      let breaks = LineBreak.findBreakpoints(
-        currentItems,
-        width,
-        pretolerance,
-        looseness,
-        false,
-        0,
-        context
-      );
-
-      // Second pass: with hyphenation if first pass failed
-      if (breaks.length === 0 && useHyphenation) {
-        const itemsWithHyphenation = LineBreak.itemizeText(
-          text,
-          measureText,
-          measureTextWidths,
-          true,
-          language,
-          hyphenationPatterns,
-          lefthyphenmin,
-          righthyphenmin,
-          context
-        );
-        currentItems = itemsWithHyphenation;
-        breaks = LineBreak.findBreakpoints(
-          currentItems,
-          width,
-          tolerance,
-          looseness,
-          false,
-          0,
-          context
-        );
-      }
-
-      // Emergency pass: add emergency stretch to background stretchability
-      if (breaks.length === 0) {
-        // For first emergency attempt, use initialEmergencyStretch
-        // For subsequent iterations (short line detection), progressively increase
-        currentEmergencyStretch =
-          initialEmergencyStretch +
-          iteration * width * SHORT_LINE_EMERGENCY_STRETCH_INCREMENT;
-        breaks = LineBreak.findBreakpoints(
-          currentItems,
-          width,
-          tolerance,
-          looseness,
-          true,
-          currentEmergencyStretch,
-          context
-        );
-      }
-
-      // Last resort: allow higher badness (but not infinite)
-      if (breaks.length === 0) {
-        breaks = LineBreak.findBreakpoints(
-          currentItems,
-          width,
-          INF_BAD,
-          looseness,
-          true,
-          currentEmergencyStretch,
-          context
-        );
-      }
-
-      // Create lines from breaks
-      if (breaks.length > 0) {
-        const cumulativeWidths =
-          LineBreak.computeCumulativeWidths(currentItems);
-        resultLines = LineBreak.createLines(
-          text,
-          currentItems,
-          breaks,
-          width,
-          align,
-          direction,
-          cumulativeWidths,
-          context
-        );
-
-        // Check for short lines if detection is enabled
-        if (
-          shortLineDetectionEnabled &&
-          breaks.length > 1 &&
-          LineBreak.hasShortLines(
-            currentItems,
-            breaks,
-            width,
-            shortLineThreshold
-          )
-        ) {
-          // Retry with more emergency stretch to push words to next line
-          iteration++;
-          continue;
+    // Third pass: with emergency stretch, retry with increasing amounts
+    if (!best) {
+      const MAX_EMERGENCY_ITERATIONS = 5;
+      for (let i = 0; i < MAX_EMERGENCY_ITERATIONS && !best; i++) {
+        const currentStretch = initialEmergencyStretch + i * width * EMERGENCY_STRETCH_INCREMENT;
+        best = this.lineBreak(items, width, tolerance, currentStretch, context);
+        
+        // Fourth pass: high threshold with current stretch
+        if (!best) {
+          best = this.lineBreak(items, width, INF_BAD, currentStretch, context);
         }
+      }
+    }
 
-        break;
+    if (best) {
+      const breakpoints: number[] = [];
+      let node: BreakNode | null = best;
+      while (node && node.position > 0) {
+        breakpoints.unshift(node.position);
+        node = node.previous;
       }
 
-      break;
+      perfLogger.end('LineBreak.breakText');
+      return this.postLineBreak(text, items, breakpoints, width, align, direction, context);
     }
 
     perfLogger.end('LineBreak.breakText');
-
-    if (resultLines && resultLines.length > 0) {
-      return resultLines;
-    }
-
-    // Fallback: single line
-    const measuredWidth = measureText(text);
-    return [
-      {
-        text,
-        originalStart: 0,
-        originalEnd: text.length - 1,
-        xOffset: 0,
-        adjustmentRatio: 0,
-        isLastLine: true,
-        naturalWidth: measuredWidth,
-        endedWithHyphen: false
-      }
-    ];
+    return [{
+      text,
+      originalStart: 0,
+      originalEnd: text.length - 1,
+      xOffset: 0,
+      adjustmentRatio: 0,
+      isLastLine: true,
+      naturalWidth: measureText(text),
+      endedWithHyphen: false
+    }];
   }
 
-  private static findBreakpoints(
-    items: Item[], // array of items (boxes, glues, penalties)
-    lineWidth: number, // desired line width
-    threshold: number = Infinity, // maximum badness allowed for a break
-    looseness: number = 0, // desired line count adjustment
-    isFinalPass: boolean = false, // whether this is the final pass
-    backgroundStretch: number = 0, // additional stretchability for all glue (emergency stretch)
-    context?: LineBreakContext
-  ): number[] {
-    // Pre-compute cumulative widths for fast range queries
-    const cumulativeWidths = LineBreak.computeCumulativeWidths(items);
-
-    const activeNodes = new ActiveNodeList();
-    const minimumDemerits = { value: Infinity };
-
-    activeNodes.insert({
-      position: 0,
-      line: 0,
-      fitness: FitnessClass.NORMAL,
-      totalDemerits: 0,
-      totalWidth: 0,
-      previous: null,
-      active: true
-    });
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-
-      if (
-        item.type === ItemType.PENALTY &&
-        (item as Penalty).penalty < Infinity
-      ) {
-        LineBreak.considerBreak(
-          items,
-          activeNodes,
-          i,
-          lineWidth,
-          threshold,
-          backgroundStretch,
-          cumulativeWidths,
-          context,
-          isFinalPass,
-          minimumDemerits
-        );
-      }
-
-      if (
-        item.type === ItemType.DISCRETIONARY &&
-        (item as Discretionary).penalty < Infinity
-      ) {
-        LineBreak.considerBreak(
-          items,
-          activeNodes,
-          i,
-          lineWidth,
-          threshold,
-          backgroundStretch,
-          cumulativeWidths,
-          context,
-          isFinalPass,
-          minimumDemerits
-        );
-      }
-
-      if (
-        item.type === ItemType.GLUE &&
-        i > 0 &&
-        items[i - 1].type === ItemType.BOX
-      ) {
-        LineBreak.considerBreak(
-          items,
-          activeNodes,
-          i,
-          lineWidth,
-          threshold,
-          backgroundStretch,
-          cumulativeWidths,
-          context,
-          isFinalPass,
-          minimumDemerits
-        );
-      }
-
-      LineBreak.deactivateNodes(
-        activeNodes,
-        i,
-        lineWidth,
-        cumulativeWidths.minWidths
-      );
-    }
-
-    const breakpoints: number[] = [];
-
-    let bestNode: BreakNode | null = null;
-
-    if (looseness === 0) {
-      // Find the node with lowest demerits
-      const allActive = activeNodes.getAllActive();
-      let lowestDemerits = Infinity;
-      for (const node of allActive) {
-        if (!node.active) continue;
-        if (node.totalDemerits < lowestDemerits) {
-          lowestDemerits = node.totalDemerits;
-          bestNode = node;
-        }
-      }
-    } else {
-      // Looseness adjustment: find best node with desired line count
-      const allActive = activeNodes.getAllActive();
-
-      // Find bestLine from lowest-demerit node (TeX: best_line = line_number(best_bet))
-      let bestLine = 0;
-      let fewestDemeritsForBaseline = Infinity;
-      for (const node of allActive) {
-        if (!node.active) continue;
-        if (node.totalDemerits < fewestDemeritsForBaseline) {
-          fewestDemeritsForBaseline = node.totalDemerits;
-          bestLine = node.line;
-        }
-      }
-
-      // Find best node for desired looseness relative to bestLine
-      let actualLooseness = 0;
-      let fewestDemerits = Infinity;
-
-      for (const node of allActive) {
-        if (!node.active) continue;
-
-        const lineDiff = node.line - bestLine;
-
-        if (
-          (lineDiff < actualLooseness && looseness <= lineDiff) ||
-          (lineDiff > actualLooseness && looseness >= lineDiff)
-        ) {
-          bestNode = node;
-          actualLooseness = lineDiff;
-          fewestDemerits = node.totalDemerits;
-        } else if (
-          lineDiff === actualLooseness &&
-          node.totalDemerits < fewestDemerits
-        ) {
-          bestNode = node;
-          fewestDemerits = node.totalDemerits;
-        }
-      }
-
-      // If we couldn't achieve the desired looseness and it's not the final pass,
-      // return empty to try again with different parameters
-      if (!isFinalPass && actualLooseness !== looseness && bestNode) {
-        return [];
-      }
-    }
-
-    if (!bestNode) {
-      return [];
-    }
-
-    while (bestNode && bestNode.position > 0) {
-      breakpoints.unshift(bestNode.position);
-      bestNode = bestNode.previous;
-    }
-
-    return breakpoints;
-  }
-
-  private static considerBreak(
-    items: Item[],
-    activeNodes: ActiveNodeList,
-    breakpoint: number,
-    lineWidth: number,
-    threshold: number = Infinity,
-    backgroundStretch: number = 0,
-    cumulativeWidths?: {
-      widths: number[];
-      stretches: number[];
-      shrinks: number[];
-      minWidths: number[];
-    },
-    context?: LineBreakContext,
-    isFinalPass: boolean = false,
-    minimumDemerits: { value: number } = { value: Infinity }
-  ): void {
-    const penalty =
-      items[breakpoint].type === ItemType.PENALTY
-        ? (items[breakpoint] as Penalty).penalty
-        : 0;
-
-    const isForcedBreak = penalty <= -Infinity;
-
-    const allActiveNodes = activeNodes.getAllActive();
-
-    for (let i = 0; i < allActiveNodes.length; i++) {
-      const node = allActiveNodes[i];
-
-      if (!node.active) continue;
-
-      const adjustmentData = LineBreak.computeAdjustmentRatio(
-        items,
-        node.position,
-        breakpoint,
-        node.line,
-        lineWidth,
-        cumulativeWidths,
-        context
-      );
-
-      const {
-        ratio: r,
-        adjustment,
-        stretch,
-        shrink,
-        totalWidth
-      } = adjustmentData;
-
-      // Calculate badness
-      let badness: number;
-      if (adjustment > 0) {
-        // backgroundStretch includes emergency stretch if in emergency pass
-        const effectiveStretch = stretch + backgroundStretch;
-        if (effectiveStretch <= 0) {
-          // Overfull box - badness is infinite + 1
-          badness = INF_BAD + 1;
-        } else {
-          badness = LineBreak.badness(adjustment, effectiveStretch);
-        }
-      } else if (adjustment < 0) {
-        if (shrink <= 0) {
-          // Can't shrink - overfull box
-          badness = INF_BAD + 1;
-        } else if (-adjustment > shrink) {
-          // Overfull box (can't shrink enough)
-          badness = INF_BAD + 1;
-        } else {
-          badness = LineBreak.badness(-adjustment, shrink);
-        }
-      } else {
-        badness = 0;
-      }
-
-      // Artificial demerits: in final pass with no feasible solution yet
-      // and only one active node left, force this break as a last resort
-      const isLastResort =
-        isFinalPass &&
-        isForcedBreak &&
-        minimumDemerits.value === Infinity &&
-        allActiveNodes.length === 1 &&
-        node.active;
-
-      if (!isForcedBreak && !isLastResort && r < -1) {
-        continue; // too tight
-      }
-
-      const fitnessClass = LineBreak.computeFitnessClass(
-        badness,
-        adjustment > 0
-      );
-
-      if (!isForcedBreak && !isLastResort && badness > threshold) {
-        continue;
-      }
-
-      // Initialize demerits with saturation check
-      let flaggedDemerits = 0;
-      let fitnessDemerits = 0;
-      const configuredLinePenalty = context?.linePenalty ?? 0;
-      let d = configuredLinePenalty + badness;
-      let demerits = Math.abs(d) >= 10000 ? 100000000 : d * d;
-
-      const artificialDemerits = isLastResort;
-
-      const breakpointPenalty =
-        items[breakpoint].type === ItemType.PENALTY
-          ? (items[breakpoint] as Penalty).penalty
-          : items[breakpoint].type === ItemType.DISCRETIONARY
-            ? (items[breakpoint] as Discretionary).penalty
-            : 0;
-
-      // Penalty contribution to demerits
-      if (breakpointPenalty !== 0) {
-        if (breakpointPenalty > 0) {
-          demerits += breakpointPenalty * breakpointPenalty;
-        } else if (breakpointPenalty > FORCED_BREAK) {
-          demerits -= breakpointPenalty * breakpointPenalty;
-        }
-      }
-
-      const breakpointFlagged =
-        (items[breakpoint].type === ItemType.PENALTY &&
-          (items[breakpoint] as Penalty).flagged) ||
-        (items[breakpoint].type === ItemType.DISCRETIONARY &&
-          (items[breakpoint] as Discretionary).flagged);
-
-      const nodeFlagged =
-        node.position > 0 &&
-        ((items[node.position].type === ItemType.PENALTY &&
-          (items[node.position] as Penalty).flagged) ||
-          (items[node.position].type === ItemType.DISCRETIONARY &&
-            (items[node.position] as Discretionary).flagged));
-
-      if (breakpointFlagged && nodeFlagged) {
-        flaggedDemerits = context?.doubleHyphenDemerits ?? 0;
-        demerits += flaggedDemerits;
-      }
-
-      if (Math.abs(fitnessClass - node.fitness) > 1) {
-        fitnessDemerits = context?.adjDemerits ?? 0;
-        demerits += fitnessDemerits;
-      }
-
-      if (isForcedBreak || artificialDemerits) {
-        demerits = 0;
-      }
-
-      const totalDemerits = node.totalDemerits + demerits;
-      if (totalDemerits < minimumDemerits.value) {
-        minimumDemerits.value = totalDemerits;
-      }
-
-      let existingNode = activeNodes.findExisting(breakpoint, fitnessClass);
-
-      if (existingNode) {
-        if (totalDemerits < existingNode.totalDemerits) {
-          existingNode.totalDemerits = totalDemerits;
-          existingNode.previous = node;
-          existingNode.totalWidth = totalWidth;
-        }
-      } else {
-        activeNodes.insert({
-          position: breakpoint,
-          line: node.line + 1,
-          fitness: fitnessClass,
-          totalDemerits,
-          totalWidth,
-          previous: node,
-          active: true
-        });
-      }
-    }
-  }
-
-  private static computeAdjustmentRatio(
-    items: Item[],
-    lineStart: number,
-    lineEnd: number,
-    _lineNumber: number,
-    lineWidth: number,
-    cumulativeWidths?: {
-      widths: number[];
-      stretches: number[];
-      shrinks: number[];
-      minWidths: number[];
-    },
-    context?: LineBreakContext
-  ): {
-    ratio: number;
-    adjustment: number;
-    stretch: number;
-    shrink: number;
-    totalWidth: number;
-  } {
-    let totalWidth = 0;
-    let totalStretch = 0;
-    let totalShrink = 0;
-
-    if (cumulativeWidths) {
-      // Fast path: use cumulative widths
-      totalWidth =
-        cumulativeWidths.widths[lineEnd] - cumulativeWidths.widths[lineStart];
-      totalStretch =
-        cumulativeWidths.stretches[lineEnd] -
-        cumulativeWidths.stretches[lineStart];
-      totalShrink =
-        cumulativeWidths.shrinks[lineEnd] - cumulativeWidths.shrinks[lineStart];
-
-      for (let i = lineStart; i < lineEnd; i++) {
-        const item = items[i];
-        if (item.type === ItemType.PENALTY) {
-          totalWidth -= item.width; // Subtract penalty widths
-        }
-      }
-    } else {
-      // Fallback: compute from scratch
-      for (let i = lineStart; i < lineEnd; i++) {
-        const item = items[i];
-
-        // Penalties never contribute width (they're just break points)
-        if (item.type === ItemType.PENALTY) {
-          continue;
-        }
-
-        totalWidth += item.width;
-
-        if (item.type === ItemType.GLUE) {
-          totalStretch += (item as Glue).stretch;
-          totalShrink += (item as Glue).shrink;
-        }
-      }
-    }
-
-    if (
-      lineEnd < items.length &&
-      (items[lineEnd].type === ItemType.PENALTY ||
-        items[lineEnd].type === ItemType.DISCRETIONARY)
-    ) {
-      totalWidth +=
-        items[lineEnd].type === ItemType.PENALTY
-          ? items[lineEnd].width
-          : (items[lineEnd] as Discretionary).preBreakWidth;
-    }
-
-    // Correct for trailing letter spacing at the end of the line segment
-    // Our token measurement includes letter spacing after the final glyph;
-    // shaping does not add letter spacing after the final glyph in a line
-    if (context?.letterSpacingFU && totalWidth !== 0) {
-      totalWidth -= context.letterSpacingFU;
-    }
-
-    const adjustment = lineWidth - totalWidth;
-
-    let ratio;
-    if (adjustment > 0 && totalStretch > 0) {
-      ratio = adjustment / totalStretch;
-    } else if (adjustment < 0 && totalShrink > 0) {
-      ratio = adjustment / totalShrink;
-    } else if (adjustment === 0) {
-      ratio = 0;
-    } else {
-      ratio = adjustment > 0 ? 3 : -1;
-    }
-
-    return {
-      ratio,
-      adjustment,
-      stretch: totalStretch,
-      shrink: totalShrink,
-      totalWidth
-    };
-  }
-
-  private static computeFitnessClass(
-    badness: number,
-    stretching: boolean
-  ): FitnessClass {
-    // TeX fitness classification based on badness (tex.web lines 16799-16803, 16810-16813)
-    if (stretching) {
-      // Stretching: decent_fit (0-12), loose_fit (13-99), very_loose_fit (100+)
-      if (badness <= FITNESS_TIGHT_THRESHOLD) return FitnessClass.NORMAL;
-      if (badness <= FITNESS_NORMAL_THRESHOLD) return FitnessClass.LOOSE;
-      return FitnessClass.VERY_LOOSE;
-    } else {
-      // Shrinking: decent_fit (0-12), tight_fit (13+)
-      if (badness <= FITNESS_TIGHT_THRESHOLD) return FitnessClass.NORMAL;
-      return FitnessClass.TIGHT;
-    }
-  }
-
-  // Pre-compute cumulative arrays for width, stretch, shrink, and minimum width
-  private static computeCumulativeWidths(items: Item[]): {
-    widths: number[];
-    stretches: number[];
-    shrinks: number[];
-    minWidths: number[];
-  } {
-    const n = items.length + 1;
-    const widths = new Array(n);
-    const stretches = new Array(n);
-    const shrinks = new Array(n);
-    const minWidths = new Array(n);
-
-    widths[0] = 0;
-    stretches[0] = 0;
-    shrinks[0] = 0;
-    minWidths[0] = 0;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-
-      widths[i + 1] = widths[i] + item.width;
-
-      if (item.type === ItemType.PENALTY) {
-        stretches[i + 1] = stretches[i];
-        shrinks[i + 1] = shrinks[i];
-        minWidths[i + 1] = minWidths[i];
-      } else if (item.type === ItemType.GLUE) {
-        const glue = item as Glue;
-        stretches[i + 1] = stretches[i] + glue.stretch;
-        shrinks[i + 1] = shrinks[i] + glue.shrink;
-        minWidths[i + 1] = minWidths[i] + Math.max(0, glue.width - glue.shrink);
-      } else {
-        stretches[i + 1] = stretches[i];
-        shrinks[i + 1] = shrinks[i];
-        minWidths[i + 1] = minWidths[i] + item.width;
-      }
-    }
-
-    return { widths, stretches, shrinks, minWidths };
-  }
-
-  // Deactivate nodes that can't lead to good line breaks
-  private static deactivateNodes(
-    activeNodeList: ActiveNodeList,
-    currentPosition: number,
-    lineWidth: number,
-    minWidths: number[]
-  ): void {
-    const activeNodes = activeNodeList.getAllActive();
-
-    for (let i = activeNodes.length - 1; i >= 0; i--) {
-      const node = activeNodes[i];
-
-      if (!node.active) continue;
-
-      const minWidth = minWidths[currentPosition] - minWidths[node.position];
-
-      if (minWidth > lineWidth) {
-        activeNodeList.deactivateNode(node);
-      }
-    }
-  }
-
-  // Create LineInfo objects from the breakpoints
-  private static createLines(
+  // TeX: post_line_break (tex.web lines 17260-17448)
+  // Creates the actual lines from the computed breakpoints
+  private static postLineBreak(
     text: string,
     items: Item[],
     breakpoints: number[],
     lineWidth: number,
     align: TextAlign,
     direction: TextDirection,
-    cumulativeWidths?: {
-      widths: number[];
-      stretches: number[];
-      shrinks: number[];
-      minWidths: number[];
-    },
     context?: LineBreakContext
   ): LineInfo[] {
     if (breakpoints.length === 0) {
-      return [
-        {
+      return [{
           text,
           originalStart: 0,
           originalEnd: text.length - 1,
           xOffset: 0
-        }
-      ];
+      }];
     }
 
     const lines: LineInfo[] = [];
@@ -1665,33 +1034,26 @@ export class LineBreak {
 
     for (let i = 0; i < breakpoints.length; i++) {
       const breakpoint = breakpoints[i];
-      // Final line created separately if content remains after last breakpoint
-      const willHaveFinalLine =
-        breakpoints[breakpoints.length - 1] + 1 < items.length - 1;
-      const isLastLine = willHaveFinalLine
-        ? false
-        : i === breakpoints.length - 1;
+      const willHaveFinalLine = breakpoints[breakpoints.length - 1] + 1 < items.length - 1;
+      const isLastLine = willHaveFinalLine ? false : i === breakpoints.length - 1;
 
       const lineTextParts: string[] = [];
       let originalStart = -1;
       let originalEnd = -1;
       let naturalWidth = 0;
+      let totalStretch = 0;
+      let totalShrink = 0;
 
       for (let j = lineStart; j < breakpoint; j++) {
         const item = items[j];
 
-        // Skip penalties and discretionaries with no display text (potential break positions only)
-        if (
-          (item.type === ItemType.PENALTY && !item.text) ||
-          (item.type === ItemType.DISCRETIONARY &&
-            !(item as Discretionary).noBreak)
-        ) {
+        if ((item.type === ItemType.PENALTY && !item.text) ||
+            (item.type === ItemType.DISCRETIONARY && !(item as Discretionary).noBreak)) {
           continue;
         }
 
         if (item.originIndex !== undefined) {
-          if (originalStart === -1 || item.originIndex < originalStart)
-            originalStart = item.originIndex;
+          if (originalStart === -1 || item.originIndex < originalStart) originalStart = item.originIndex;
           const textLength = item.text ? item.text.length : 0;
           const itemEnd = item.originIndex + textLength - 1;
           if (itemEnd > originalEnd) originalEnd = itemEnd;
@@ -1701,52 +1063,45 @@ export class LineBreak {
           lineTextParts.push(item.text);
         } else if (item.type === ItemType.DISCRETIONARY) {
           const disc = item as Discretionary;
-          if (disc.noBreak) {
-            lineTextParts.push(disc.noBreak);
-          }
+          if (disc.noBreak) lineTextParts.push(disc.noBreak);
         }
 
         naturalWidth += item.width;
+
+        if (item.type === ItemType.GLUE) {
+          totalStretch += (item as Glue).stretch;
+          totalShrink += (item as Glue).shrink;
+        }
       }
 
       const breakItem = items[breakpoint];
       let endedWithHyphen = false;
+
       if (breakpoint < items.length) {
-        if (
-          breakItem.type === ItemType.PENALTY &&
-          (breakItem as Penalty).flagged
-        ) {
+        if (breakItem.type === ItemType.PENALTY && (breakItem as Penalty).flagged) {
           lineTextParts.push('-');
           naturalWidth += breakItem.width;
           endedWithHyphen = true;
-
-          if (breakItem.originIndex !== undefined) {
-            originalEnd = breakItem.originIndex - 1;
-          }
+          if (breakItem.originIndex !== undefined) originalEnd = breakItem.originIndex - 1;
         } else if (breakItem.type === ItemType.DISCRETIONARY) {
           const disc = breakItem as Discretionary;
           if (disc.preBreak) {
             lineTextParts.push(disc.preBreak);
             naturalWidth += disc.preBreakWidth;
             endedWithHyphen = disc.flagged || false;
-
-            if (breakItem.originIndex !== undefined) {
-              originalEnd = breakItem.originIndex - 1;
-            }
+            if (breakItem.originIndex !== undefined) originalEnd = breakItem.originIndex - 1;
           }
         }
       }
 
       const lineText = lineTextParts.join('');
 
-      // Correct for trailing letter spacing at the end of the line
       if (context?.letterSpacingFU && naturalWidth !== 0) {
         naturalWidth -= context.letterSpacingFU;
       }
 
       let xOffset = 0;
       let adjustmentRatio = 0;
-
       let effectiveAlign = align;
 
       if (align === 'justify' && isLastLine) {
@@ -1758,16 +1113,12 @@ export class LineBreak {
       } else if (effectiveAlign === 'right') {
         xOffset = lineWidth - naturalWidth;
       } else if (effectiveAlign === 'justify' && !isLastLine) {
-        const adjustmentData = LineBreak.computeAdjustmentRatio(
-          items,
-          lineStart,
-          breakpoint,
-          i,
-          lineWidth,
-          cumulativeWidths,
-          context
-        );
-        adjustmentRatio = adjustmentData.ratio;
+        const shortfall = lineWidth - naturalWidth;
+        if (shortfall > 0 && totalStretch > 0) {
+          adjustmentRatio = shortfall / totalStretch;
+        } else if (shortfall < 0 && totalShrink > 0) {
+          adjustmentRatio = shortfall / totalShrink;
+        }
       }
 
       lines.push({
@@ -1777,13 +1128,14 @@ export class LineBreak {
         xOffset,
         adjustmentRatio,
         isLastLine: false,
-        naturalWidth: naturalWidth,
-        endedWithHyphen: endedWithHyphen
+        naturalWidth,
+        endedWithHyphen
       });
 
       lineStart = breakpoint + 1;
     }
 
+    // Handle remaining content
     if (lineStart < items.length - 1) {
       const finalLineTextParts: string[] = [];
       let finalOriginalStart = -1;
@@ -1793,15 +1145,10 @@ export class LineBreak {
       for (let j = lineStart; j < items.length - 1; j++) {
         const item = items[j];
 
-        if (item.type === ItemType.PENALTY) {
-          continue;
-        }
+        if (item.type === ItemType.PENALTY) continue;
 
         if (item.originIndex !== undefined) {
-          if (
-            finalOriginalStart === -1 ||
-            item.originIndex < finalOriginalStart
-          ) {
+          if (finalOriginalStart === -1 || item.originIndex < finalOriginalStart) {
             finalOriginalStart = item.originIndex;
           }
           if (item.originIndex > finalOriginalEnd) {
@@ -1809,16 +1156,10 @@ export class LineBreak {
           }
         }
 
-        if (item.text) {
-          finalLineTextParts.push(item.text);
-        }
-
+        if (item.text) finalLineTextParts.push(item.text);
         finalNaturalWidth += item.width;
       }
 
-      const finalLineText = finalLineTextParts.join('');
-
-      // Correct for trailing letter spacing at the end of the final line
       if (context?.letterSpacingFU && finalNaturalWidth !== 0) {
         finalNaturalWidth -= context.letterSpacingFU;
       }
@@ -1837,19 +1178,17 @@ export class LineBreak {
       }
 
       lines.push({
-        text: finalLineText,
+        text: finalLineTextParts.join(''),
         originalStart: finalOriginalStart,
         originalEnd: finalOriginalEnd,
         xOffset: finalXOffset,
-        adjustmentRatio: 0, // Last line has no adjustment
+        adjustmentRatio: 0,
         isLastLine: true,
         naturalWidth: finalNaturalWidth,
         endedWithHyphen: false
       });
 
-      if (lines.length > 1) {
-        lines[lines.length - 2].isLastLine = false;
-      }
+      if (lines.length > 1) lines[lines.length - 2].isLastLine = false;
       lines[lines.length - 1].isLastLine = true;
     } else if (lines.length > 0) {
       lines[lines.length - 1].isLastLine = true;
