@@ -306,7 +306,8 @@ export class LineBreak {
     availablePatterns?: HyphenationPatternsMap,
     lefthyphenmin: number = DEFAULT_LEFT_HYPHEN_MIN,
     righthyphenmin: number = DEFAULT_RIGHT_HYPHEN_MIN,
-    context?: LineBreakContext
+    context?: LineBreakContext,
+    lineWidth?: number
   ): Item[] {
     const items: Item[] = [];
 
@@ -320,7 +321,8 @@ export class LineBreak {
         availablePatterns,
         lefthyphenmin,
         righthyphenmin,
-        context
+        context,
+        lineWidth
       )
     );
 
@@ -476,7 +478,8 @@ export class LineBreak {
     availablePatterns: HyphenationPatternsMap | undefined,
     lefthyphenmin: number,
     righthyphenmin: number,
-    context: LineBreakContext | undefined
+    context: LineBreakContext | undefined,
+    lineWidth?: number
   ): Item[] {
     const items: Item[] = [];
     const chars = Array.from(text);
@@ -501,7 +504,7 @@ export class LineBreak {
       if (bufferScript === 'cjk') {
         items.push(...this.itemizeCJKText(buffer, measureText, measureTextWidths, context, bufferStart, getCjkGlueParams()));
       } else {
-        items.push(...this.itemizeWordBased(buffer, bufferStart, measureText, hyphenate, language, availablePatterns, lefthyphenmin, righthyphenmin, context));
+        items.push(...this.itemizeWordBased(buffer, bufferStart, measureText, hyphenate, language, availablePatterns, lefthyphenmin, righthyphenmin, context, lineWidth));
       }
 
       buffer = '';
@@ -540,7 +543,8 @@ export class LineBreak {
     availablePatterns: HyphenationPatternsMap | undefined,
     lefthyphenmin: number,
     righthyphenmin: number,
-    context: LineBreakContext | undefined
+    context: LineBreakContext | undefined,
+    lineWidth?: number
   ): Item[] {
     const items: Item[] = [];
     const tokens = text.match(/\S+|\s+/g) || [];
@@ -645,20 +649,66 @@ export class LineBreak {
                   originIndex: segmentIndex + lastPoint
                 } as Box);
               } else {
+                const wordWidth = measureText(segment);
+                if (lineWidth && wordWidth > lineWidth) {
+                  // Word longer than line width - break into characters
+                  const chars = Array.from(segment);
+                  for (let i = 0; i < chars.length; i++) {
+                    items.push({
+                      type: ItemType.BOX,
+                      width: measureText(chars[i]),
+                      text: chars[i],
+                      originIndex: segmentIndex + i
+                    } as Box);
+                    
+                    if (i < chars.length - 1) {
+                      items.push({
+                        type: ItemType.PENALTY,
+                        width: 0,
+                        penalty: 5000,
+                        originIndex: segmentIndex + i + 1
+                      } as Penalty);
+                    }
+                  }
+                } else {
+                  items.push({
+                    type: ItemType.BOX,
+                    width: wordWidth,
+                    text: segment,
+                    originIndex: segmentIndex
+                  } as Box);
+                }
+              }
+            } else {
+              const wordWidth = measureText(segment);
+              if (lineWidth && wordWidth > lineWidth) {
+                // Word longer than line width - break into characters
+                const chars = Array.from(segment);
+                for (let i = 0; i < chars.length; i++) {
+                  items.push({
+                    type: ItemType.BOX,
+                    width: measureText(chars[i]),
+                    text: chars[i],
+                    originIndex: segmentIndex + i
+                  } as Box);
+                  
+                  if (i < chars.length - 1) {
+                    items.push({
+                      type: ItemType.PENALTY,
+                      width: 0,
+                      penalty: 5000,
+                      originIndex: segmentIndex + i + 1
+                    } as Penalty);
+                  }
+                }
+              } else {
                 items.push({
                   type: ItemType.BOX,
-                  width: measureText(segment),
+                  width: wordWidth,
                   text: segment,
                   originIndex: segmentIndex
                 } as Box);
               }
-            } else {
-              items.push({
-                type: ItemType.BOX,
-                width: measureText(segment),
-                text: segment,
-                originIndex: segmentIndex
-              } as Box);
             }
             segmentIndex += segment.length;
         }
@@ -961,12 +1011,12 @@ export class LineBreak {
     }
 
     // First pass: without hyphenation
-    let items = this.itemizeText(text, measureText, measureTextWidths, false, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context);
+    let items = this.itemizeText(text, measureText, measureTextWidths, false, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context, width);
     let best = this.lineBreak(items, width, pretolerance, 0, context);
 
     // Second pass: with hyphenation
     if (!best && useHyphenation) {
-      items = this.itemizeText(text, measureText, measureTextWidths, true, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context);
+      items = this.itemizeText(text, measureText, measureTextWidths, true, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context, width);
       best = this.lineBreak(items, width, tolerance, 0, context);
     }
 
