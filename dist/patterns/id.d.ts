@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const id_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Indonesian
+export declare const id_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Indonesian
+export declare const id_righthyphenmin: number;
+
 export default id_patterns;

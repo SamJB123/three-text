@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const sh_latn_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Serbo-Croatian (Latin)
+export declare const sh_latn_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Serbo-Croatian (Latin)
+export declare const sh_latn_righthyphenmin: number;
+
 export default sh_latn_patterns;

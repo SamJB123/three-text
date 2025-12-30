@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const bg_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Bulgarian
+export declare const bg_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Bulgarian
+export declare const bg_righthyphenmin: number;
+
 export default bg_patterns;

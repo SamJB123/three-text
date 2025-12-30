@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const tk_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Turkmen
+export declare const tk_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Turkmen
+export declare const tk_righthyphenmin: number;
+
 export default tk_patterns;

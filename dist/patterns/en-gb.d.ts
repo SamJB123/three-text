@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const en_gb_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for British English
+export declare const en_gb_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for British English
+export declare const en_gb_righthyphenmin: number;
+
 export default en_gb_patterns;

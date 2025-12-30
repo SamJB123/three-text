@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const kn_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Kannada
+export declare const kn_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Kannada
+export declare const kn_righthyphenmin: number;
+
 export default kn_patterns;

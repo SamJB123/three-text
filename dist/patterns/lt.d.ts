@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const lt_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Lithuanian
+export declare const lt_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Lithuanian
+export declare const lt_righthyphenmin: number;
+
 export default lt_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const sr_cyrl_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Serbian (Cyrillic)
+export declare const sr_cyrl_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Serbian (Cyrillic)
+export declare const sr_cyrl_righthyphenmin: number;
+
 export default sr_cyrl_patterns;

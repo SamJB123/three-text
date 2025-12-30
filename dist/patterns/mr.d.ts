@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const mr_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Marathi
+export declare const mr_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Marathi
+export declare const mr_righthyphenmin: number;
+
 export default mr_patterns;

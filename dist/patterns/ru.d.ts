@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ru_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Russian
+export declare const ru_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Russian
+export declare const ru_righthyphenmin: number;
+
 export default ru_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ga_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Irish
+export declare const ga_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Irish
+export declare const ga_righthyphenmin: number;
+
 export default ga_patterns;

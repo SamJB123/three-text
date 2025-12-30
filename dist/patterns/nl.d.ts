@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const nl_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Dutch
+export declare const nl_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Dutch
+export declare const nl_righthyphenmin: number;
+
 export default nl_patterns;

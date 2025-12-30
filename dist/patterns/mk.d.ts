@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const mk_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Macedonian
+export declare const mk_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Macedonian
+export declare const mk_righthyphenmin: number;
+
 export default mk_patterns;

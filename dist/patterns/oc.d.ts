@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const oc_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Occitan
+export declare const oc_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Occitan
+export declare const oc_righthyphenmin: number;
+
 export default oc_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const th_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Thai
+export declare const th_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Thai
+export declare const th_righthyphenmin: number;
+
 export default th_patterns;

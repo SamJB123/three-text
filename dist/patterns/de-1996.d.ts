@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const de_1996_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for German
+export declare const de_1996_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for German
+export declare const de_1996_righthyphenmin: number;
+
 export default de_1996_patterns;

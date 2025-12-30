@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const en_us_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for US English
+export declare const en_us_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for US English
+export declare const en_us_righthyphenmin: number;
+
 export default en_us_patterns;

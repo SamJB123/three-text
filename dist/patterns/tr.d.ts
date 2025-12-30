@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const tr_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Turkish
+export declare const tr_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Turkish
+export declare const tr_righthyphenmin: number;
+
 export default tr_patterns;

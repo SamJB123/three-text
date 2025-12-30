@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const et_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Estonian
+export declare const et_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Estonian
+export declare const et_righthyphenmin: number;
+
 export default et_patterns;

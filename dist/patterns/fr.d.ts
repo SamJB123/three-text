@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const fr_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for French
+export declare const fr_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for French
+export declare const fr_righthyphenmin: number;
+
 export default fr_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const uk_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Ukrainian
+export declare const uk_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Ukrainian
+export declare const uk_righthyphenmin: number;
+
 export default uk_patterns;

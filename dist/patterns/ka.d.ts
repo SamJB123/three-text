@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ka_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Georgian
+export declare const ka_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Georgian
+export declare const ka_righthyphenmin: number;
+
 export default ka_patterns;

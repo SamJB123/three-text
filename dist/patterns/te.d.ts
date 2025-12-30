@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const te_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Telugu
+export declare const te_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Telugu
+export declare const te_righthyphenmin: number;
+
 export default te_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const gl_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Galician
+export declare const gl_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Galician
+export declare const gl_righthyphenmin: number;
+
 export default gl_patterns;

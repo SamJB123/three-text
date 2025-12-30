@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const bn_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Bengali
+export declare const bn_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Bengali
+export declare const bn_righthyphenmin: number;
+
 export default bn_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const be_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Belarusian
+export declare const be_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Belarusian
+export declare const be_righthyphenmin: number;
+
 export default be_patterns;

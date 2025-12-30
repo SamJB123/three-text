@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const af_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Afrikaans
+export declare const af_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Afrikaans
+export declare const af_righthyphenmin: number;
+
 export default af_patterns;

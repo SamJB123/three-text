@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const gu_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Gujarati
+export declare const gu_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Gujarati
+export declare const gu_righthyphenmin: number;
+
 export default gu_patterns;

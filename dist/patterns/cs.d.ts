@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const cs_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Czech
+export declare const cs_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Czech
+export declare const cs_righthyphenmin: number;
+
 export default cs_patterns;

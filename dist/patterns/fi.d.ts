@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const fi_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Finnish
+export declare const fi_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Finnish
+export declare const fi_righthyphenmin: number;
+
 export default fi_patterns;

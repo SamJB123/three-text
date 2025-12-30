@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const es_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Spanish
+export declare const es_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Spanish
+export declare const es_righthyphenmin: number;
+
 export default es_patterns;

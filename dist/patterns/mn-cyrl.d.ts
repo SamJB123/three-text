@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const mn_cyrl_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Mongolian
+export declare const mn_cyrl_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Mongolian
+export declare const mn_cyrl_righthyphenmin: number;
+
 export default mn_cyrl_patterns;

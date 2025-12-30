@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const hy_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Armenian
+export declare const hy_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Armenian
+export declare const hy_righthyphenmin: number;
+
 export default hy_patterns;

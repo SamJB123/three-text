@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const pt_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Portuguese
+export declare const pt_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Portuguese
+export declare const pt_righthyphenmin: number;
+
 export default pt_patterns;

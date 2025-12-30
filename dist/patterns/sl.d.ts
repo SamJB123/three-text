@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const sl_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Slovenian
+export declare const sl_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Slovenian
+export declare const sl_righthyphenmin: number;
+
 export default sl_patterns;

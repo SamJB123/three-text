@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const lv_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Latvian
+export declare const lv_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Latvian
+export declare const lv_righthyphenmin: number;
+
 export default lv_patterns;

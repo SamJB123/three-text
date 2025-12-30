@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const kmr_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Kurmanji Kurdish
+export declare const kmr_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Kurmanji Kurdish
+export declare const kmr_righthyphenmin: number;
+
 export default kmr_patterns;

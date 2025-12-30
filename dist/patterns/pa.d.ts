@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const pa_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Punjabi
+export declare const pa_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Punjabi
+export declare const pa_righthyphenmin: number;
+
 export default pa_patterns;

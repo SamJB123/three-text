@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const is_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Icelandic
+export declare const is_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Icelandic
+export declare const is_righthyphenmin: number;
+
 export default is_patterns;

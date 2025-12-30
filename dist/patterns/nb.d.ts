@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const nb_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Norwegian Bokmål
+export declare const nb_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Norwegian Bokmål
+export declare const nb_righthyphenmin: number;
+
 export default nb_patterns;

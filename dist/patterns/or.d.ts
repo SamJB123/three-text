@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const or_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Oriya
+export declare const or_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Oriya
+export declare const or_righthyphenmin: number;
+
 export default or_patterns;

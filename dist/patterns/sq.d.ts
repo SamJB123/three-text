@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const sq_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Albanian
+export declare const sq_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Albanian
+export declare const sq_righthyphenmin: number;
+
 export default sq_patterns;

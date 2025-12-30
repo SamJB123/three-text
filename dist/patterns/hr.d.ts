@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const hr_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Croatian
+export declare const hr_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Croatian
+export declare const hr_righthyphenmin: number;
+
 export default hr_patterns;

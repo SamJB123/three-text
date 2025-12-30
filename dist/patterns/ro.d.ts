@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ro_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Romanian
+export declare const ro_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Romanian
+export declare const ro_righthyphenmin: number;
+
 export default ro_patterns;

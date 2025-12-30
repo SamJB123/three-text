@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const eu_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Basque
+export declare const eu_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Basque
+export declare const eu_righthyphenmin: number;
+
 export default eu_patterns;

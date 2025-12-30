@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ta_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Tamil
+export declare const ta_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Tamil
+export declare const ta_righthyphenmin: number;
+
 export default ta_patterns;

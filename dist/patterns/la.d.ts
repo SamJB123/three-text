@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const la_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Latin
+export declare const la_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Latin
+export declare const la_righthyphenmin: number;
+
 export default la_patterns;

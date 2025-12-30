@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const el_monoton_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Greek (Monotonic)
+export declare const el_monoton_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Greek (Monotonic)
+export declare const el_monoton_righthyphenmin: number;
+
 export default el_monoton_patterns;

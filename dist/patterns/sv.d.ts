@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const sv_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Swedish
+export declare const sv_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Swedish
+export declare const sv_righthyphenmin: number;
+
 export default sv_patterns;

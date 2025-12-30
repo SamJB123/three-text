@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const it_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Italian
+export declare const it_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Italian
+export declare const it_righthyphenmin: number;
+
 export default it_patterns;

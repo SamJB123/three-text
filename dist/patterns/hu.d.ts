@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const hu_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Hungarian
+export declare const hu_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Hungarian
+export declare const hu_righthyphenmin: number;
+
 export default hu_patterns;

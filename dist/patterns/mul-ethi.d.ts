@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const mul_ethi_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Ethiopic
+export declare const mul_ethi_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Ethiopic
+export declare const mul_ethi_righthyphenmin: number;
+
 export default mul_ethi_patterns;

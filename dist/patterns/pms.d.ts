@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const pms_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Piedmontese
+export declare const pms_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Piedmontese
+export declare const pms_righthyphenmin: number;
+
 export default pms_patterns;

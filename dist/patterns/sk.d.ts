@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const sk_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Slovak
+export declare const sk_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Slovak
+export declare const sk_righthyphenmin: number;
+
 export default sk_patterns;

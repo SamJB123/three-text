@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const rm_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Romansh
+export declare const rm_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Romansh
+export declare const rm_righthyphenmin: number;
+
 export default rm_patterns;

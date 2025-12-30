@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const hsb_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Upper Sorbian
+export declare const hsb_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Upper Sorbian
+export declare const hsb_righthyphenmin: number;
+
 export default hsb_patterns;

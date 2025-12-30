@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const hi_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Hindi
+export declare const hi_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Hindi
+export declare const hi_righthyphenmin: number;
+
 export default hi_patterns;

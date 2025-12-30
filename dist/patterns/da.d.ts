@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const da_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Danish
+export declare const da_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Danish
+export declare const da_righthyphenmin: number;
+
 export default da_patterns;

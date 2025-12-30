@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const as_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Assamese
+export declare const as_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Assamese
+export declare const as_righthyphenmin: number;
+
 export default as_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const pl_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Polish
+export declare const pl_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Polish
+export declare const pl_righthyphenmin: number;
+
 export default pl_patterns;

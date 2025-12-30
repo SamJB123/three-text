@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ml_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Malayalam
+export declare const ml_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Malayalam
+export declare const ml_righthyphenmin: number;
+
 export default ml_patterns;

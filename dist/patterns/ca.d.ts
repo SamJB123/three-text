@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ca_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Catalan
+export declare const ca_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Catalan
+export declare const ca_righthyphenmin: number;
+
 export default ca_patterns;

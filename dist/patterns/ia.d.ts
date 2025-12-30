@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const ia_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Interlingua
+export declare const ia_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Interlingua
+export declare const ia_righthyphenmin: number;
+
 export default ia_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const eo_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Esperanto
+export declare const eo_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Esperanto
+export declare const eo_righthyphenmin: number;
+
 export default eo_patterns;

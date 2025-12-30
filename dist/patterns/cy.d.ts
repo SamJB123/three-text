@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const cy_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Welsh
+export declare const cy_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Welsh
+export declare const cy_righthyphenmin: number;
+
 export default cy_patterns;

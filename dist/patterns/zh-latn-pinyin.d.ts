@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const zh_latn_pinyin_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Chinese Pinyin
+export declare const zh_latn_pinyin_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Chinese Pinyin
+export declare const zh_latn_pinyin_righthyphenmin: number;
+
 export default zh_latn_pinyin_patterns;

@@ -18,4 +18,11 @@ export interface HyphenationTrieNode {
 }
 
 declare const fur_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for Friulian
+export declare const fur_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for Friulian
+export declare const fur_righthyphenmin: number;
+
 export default fur_patterns;
