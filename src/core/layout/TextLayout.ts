@@ -48,7 +48,6 @@ export class TextLayout {
       hyphenpenalty,
       exhyphenpenalty,
       doublehyphendemerits,
-      looseness,
       disableShortLineDetection,
       shortLineThreshold,
       letterSpacing
@@ -79,7 +78,6 @@ export class TextLayout {
         hyphenpenalty,
         exhyphenpenalty,
         doublehyphendemerits,
-        looseness,
         disableShortLineDetection,
         shortLineThreshold,
         unitsPerEm: this.loadedFont.upem,

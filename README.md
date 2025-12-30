@@ -405,7 +405,6 @@ The Knuth-Plass algorithm provides extensive control over line breaking quality:
 #### Advanced parameters
 
 - **linepenalty** (10): Base penalty added to each line's badness before squaring
-- **looseness** (0): Try to make the paragraph this many lines longer (positive) or shorter (negative)
 
 #### Hyphenation control
 
@@ -800,7 +799,6 @@ interface LayoutOptions {
   hyphenpenalty?: number; // Penalty for automatic hyphenation (default: 50)
   exhyphenpenalty?: number; // Penalty for explicit hyphens (default: 50)
   doublehyphendemerits?: number; // Penalty for consecutive hyphenated lines (default: 10000)
-  looseness?: number; // Try to make paragraph longer/shorter by this many lines
 }
 ```
 

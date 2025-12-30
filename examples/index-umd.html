@@ -957,7 +957,6 @@
         tolerance: 200,
         pretolerance: 100,
         emergencyStretch: 0,
-        looseness: 0,
         linepenalty: 10,
         adjdemerits: 10000,
         respectExistingBreaks: true,
@@ -1546,10 +1545,6 @@
         lineBreakingFolder
           .add(params, "emergencyStretch", 0, 1000, 50)
           .name("Emergency stretch")
-          .onChange(debouncedRender);
-        lineBreakingFolder
-          .add(params, "looseness", -3, 3, 1)
-          .name("Looseness")
           .onChange(debouncedRender);
         lineBreakingFolder
           .add(params, "linepenalty", 0, 100, 1)
@@ -2180,7 +2175,6 @@
                 shortLineThreshold: params.shortLineThreshold,
                 lefthyphenmin: params.lefthyphenmin,
                 righthyphenmin: params.righthyphenmin,
-                looseness: params.looseness,
                 linepenalty: params.linepenalty,
                 adjdemerits: params.adjdemerits,
                 hyphenpenalty: params.hyphenpenalty,
@@ -2226,7 +2220,6 @@
                 shortLineThreshold: params.shortLineThreshold,
                 lefthyphenmin: params.lefthyphenmin,
                 righthyphenmin: params.righthyphenmin,
-                looseness: params.looseness,
                 linepenalty: params.linepenalty,
                 adjdemerits: params.adjdemerits,
                 hyphenpenalty: params.hyphenpenalty,

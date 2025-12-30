@@ -291,7 +291,7 @@
          
 
         const params = {
-          text: `three-text is a 3D font geometry and text layout library for the web. Its supports TTF, OTF, and WOFF font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for tessellation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`,
+          text: `three-text is a 3D font geometry and text layout library for the web. Its supports TTF, OTF, and WOFF font files. For layout, \n\nit uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static \n\ninstances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, \nLiang hyphenation, libtess by Eric Veach for tessellation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`,
           lineWidth: 1400,
           fontSize: 72,
           lineHeight: 1.33,
@@ -338,7 +338,6 @@
           tolerance: 200,
           pretolerance: 100,
           emergencyStretch: 0,
-          looseness: 0,
           linepenalty: 10,
           adjdemerits: 10000,
           respectExistingBreaks: true,
@@ -966,10 +965,6 @@
             .name("Emergency stretch")
             .onChange(debouncedRender);
           lineBreakingFolder
-            .add(params, "looseness", -3, 3, 1)
-            .name("Looseness")
-            .onChange(debouncedRender);
-          lineBreakingFolder
             .add(params, "linepenalty", 0, 100, 1)
             .name("Line penalty")
             .onChange(debouncedRender);
@@ -1316,7 +1311,6 @@
                   shortLineThreshold: params.shortLineThreshold,
                   lefthyphenmin: params.lefthyphenmin,
                   righthyphenmin: params.righthyphenmin,
-                  looseness: params.looseness,
                   linepenalty: params.linepenalty,
                   adjdemerits: params.adjdemerits,
                   hyphenpenalty: params.hyphenpenalty,
@@ -1363,7 +1357,6 @@
                   shortLineThreshold: params.shortLineThreshold,
                   lefthyphenmin: params.lefthyphenmin,
                   righthyphenmin: params.righthyphenmin,
-                  looseness: params.looseness,
                   linepenalty: params.linepenalty,
                   adjdemerits: params.adjdemerits,
                   hyphenpenalty: params.hyphenpenalty,
