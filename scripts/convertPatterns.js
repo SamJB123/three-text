@@ -54,6 +54,77 @@ const EXCLUSION_LIST = new Set([
   'fi-x-school'
 ]);
 
+// Extract hyphenmin values from .tex pattern file
+// Format in tex file header:
+//   % hyphenmins:
+//   %     typesetting:
+//   %         left: 2
+//   %         right: 3
+function extractHyphenminsFromTexFile(languageCode) {
+  const texFile = path.join(TEX_PATTERNS_DIR, `hyph-${languageCode}.tex`);
+
+  // TeX defaults if not specified
+  const defaults = { left: 2, right: 3 };
+
+  if (!fs.existsSync(texFile)) {
+    return defaults;
+  }
+
+  try {
+    const content = fs.readFileSync(texFile, 'utf8');
+    const lines = content.split('\n').slice(0, 80); // Check first 80 lines for hyphenmins
+
+    let inHyphenminsBlock = false;
+    let inTypesettingBlock = false;
+    let left = null;
+    let right = null;
+
+    for (const line of lines) {
+      if (line.startsWith('% hyphenmins:')) {
+        inHyphenminsBlock = true;
+        continue;
+      }
+
+      if (inHyphenminsBlock) {
+        if (line.startsWith('%     typesetting:')) {
+          inTypesettingBlock = true;
+          continue;
+        }
+
+        if (inTypesettingBlock) {
+          const leftMatch = line.match(/%\s+left:\s*(\d+)/);
+          const rightMatch = line.match(/%\s+right:\s*(\d+)/);
+
+          if (leftMatch) {
+            left = parseInt(leftMatch[1], 10);
+          }
+          if (rightMatch) {
+            right = parseInt(rightMatch[1], 10);
+          }
+
+          // Exit if we've found both values or hit a non-comment line
+          if ((left !== null && right !== null) ||
+              (!line.startsWith('%') && line.trim().length > 0)) {
+            break;
+          }
+        }
+
+        // Exit hyphenmins block if we hit a different section
+        if (line.startsWith('% ') && !line.startsWith('%     ') && !line.startsWith('% hyphenmins:')) {
+          break;
+        }
+      }
+    }
+
+    return {
+      left: left !== null ? left : defaults.left,
+      right: right !== null ? right : defaults.right
+    };
+  } catch (e) {
+    return defaults;
+  }
+}
+
 function extractLicenseFromTexFile(languageCode) {
   const texFile = path.join(TEX_PATTERNS_DIR, `hyph-${languageCode}.tex`);
 
@@ -273,6 +344,10 @@ for (const patternFile of patternFiles) {
 
     const jsonTrie = JSON.stringify(trie);
 
+    // Extract hyphenmin values from the .tex file
+    const hyphenmins = extractHyphenminsFromTexFile(language);
+    console.log(`  Hyphenmins for ${language}: left=${hyphenmins.left}, right=${hyphenmins.right}`);
+
     const fileLicenseHeader = getLicenseHeader(language, languageDetails.name);
 
     const tsOutput = `${fileLicenseHeader}
@@ -281,11 +356,23 @@ type HyphenationTrieNode = import('./index').HyphenationTrieNode;
 
 export const ${safeLangName}_patterns: HyphenationTrieNode = ${jsonTrie};
 
+// Default minimum characters before hyphen for ${languageDetails.name}
+export const ${safeLangName}_lefthyphenmin: number = ${hyphenmins.left};
+
+// Default minimum characters after hyphen for ${languageDetails.name}
+export const ${safeLangName}_righthyphenmin: number = ${hyphenmins.right};
+
 export default ${safeLangName}_patterns;
 `;
 
     const esmOutput = `${fileLicenseHeader}
 const ${safeLangName}_patterns = ${jsonTrie};
+
+// Default minimum characters before hyphen for ${languageDetails.name}
+export const ${safeLangName}_lefthyphenmin = ${hyphenmins.left};
+
+// Default minimum characters after hyphen for ${languageDetails.name}
+export const ${safeLangName}_righthyphenmin = ${hyphenmins.right};
 
 export default ${safeLangName}_patterns;
 `;
@@ -296,18 +383,24 @@ export default ${safeLangName}_patterns;
   typeof define === 'function' && define.amd ? define(factory) :
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, 
    (function() {
-     var pattern = factory();
-     global.ThreeTextPatterns_${safeLangName} = pattern;
+     var result = factory();
+     global.ThreeTextPatterns_${safeLangName} = result.patterns;
+     global.ThreeTextPatterns_${safeLangName}_lefthyphenmin = result.lefthyphenmin;
+     global.ThreeTextPatterns_${safeLangName}_righthyphenmin = result.righthyphenmin;
      // Auto-register if ThreeText is already loaded
      if (global.ThreeText && global.ThreeText.Text && global.ThreeText.Text.registerPattern) {
-       global.ThreeText.Text.registerPattern('${language}', pattern);
+       global.ThreeText.Text.registerPattern('${language}', result.patterns);
      }
-     return pattern;
+     return result;
    })());
 })(this, (function () {
   'use strict';
   
-  return ${jsonTrie};
+  return {
+    patterns: ${jsonTrie},
+    lefthyphenmin: ${hyphenmins.left},
+    righthyphenmin: ${hyphenmins.right}
+  };
 }));
 `;
 
@@ -316,7 +409,13 @@ export default ${safeLangName}_patterns;
 
 const ${safeLangName}_patterns = ${jsonTrie};
 
+const ${safeLangName}_lefthyphenmin = ${hyphenmins.left};
+const ${safeLangName}_righthyphenmin = ${hyphenmins.right};
+
 module.exports = ${safeLangName}_patterns;
+module.exports.${safeLangName}_patterns = ${safeLangName}_patterns;
+module.exports.${safeLangName}_lefthyphenmin = ${safeLangName}_lefthyphenmin;
+module.exports.${safeLangName}_righthyphenmin = ${safeLangName}_righthyphenmin;
 `;
 
     const dtsOutput = `${fileLicenseHeader}
@@ -326,6 +425,13 @@ export interface HyphenationTrieNode {
 }
 
 declare const ${safeLangName}_patterns: HyphenationTrieNode;
+
+// Default minimum characters before hyphen for ${languageDetails.name}
+export declare const ${safeLangName}_lefthyphenmin: number;
+
+// Default minimum characters after hyphen for ${languageDetails.name}
+export declare const ${safeLangName}_righthyphenmin: number;
+
 export default ${safeLangName}_patterns;
 `;
 
