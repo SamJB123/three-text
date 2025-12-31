@@ -637,6 +637,8 @@ const text = await Text.create({
 
 Text matching occurs after layout processing, so patterns like "connection" will be found even if hyphenation splits them across lines. The `coloredRanges` property on the returned object contains the resolved color assignments for programmatic access to the colored parts of the geometry
 
+When using selective coloring with `byText` or `byCharRange`, colored glyphs are kept geometrically separate from adjacent non-colored glyphs. This ensures accurate vertex coloring while still allowing overlap removal between glyphs of the same color status, e.g. two adjacent colored letters that overlap will still be properly merged
+
 ## API reference
 
 The library's full TypeScript definitions are the most complete source of truth for the API. The core data structures and configuration options can be found in `src/core/types.ts`

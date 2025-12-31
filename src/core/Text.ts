@@ -683,6 +683,7 @@ export class Text {
                 } else {
                   lineGroups.set(glyph.lineIndex, [glyph]);
                 }
+                // Color vertices owned by this glyph
                 for (let v = 0; v < glyph.vertexCount; v++) {
                   const vertexIndex = (glyph.vertexStart + v) * 3;
                   if (vertexIndex >= 0 && vertexIndex < colors.length) {
@@ -729,6 +730,7 @@ export class Text {
                 } else {
                   lineGroups.set(glyph.lineIndex, [glyph]);
                 }
+                // Color vertices owned by this glyph
                 for (let v = 0; v < glyph.vertexCount; v++) {
                   const vertexIndex = (glyph.vertexStart + v) * 3;
                   if (vertexIndex >= 0 && vertexIndex < colors.length) {

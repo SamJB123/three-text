@@ -56,7 +56,7 @@ export class GlyphGeometryBuilder {
   private contourCache: Cache<string, GlyphContours>;
   private clusteringCache: Cache<
     string,
-    { glyphIds: number[]; groups: number[][] }
+    { glyphIds: number[]; positions: { x: number; y: number }[]; groups: number[][] }
   >;
   private emptyGlyphs: Set<number> = new Set();
 
@@ -205,8 +205,9 @@ export class GlyphGeometryBuilder {
         if (cluster.glyphs.length <= 1) {
           boundaryGroups = [[0]];
         } else {
-          // Check clustering cache (same text + glyph IDs = same overlap groups)
+          // Check clustering cache (same text + glyph IDs + positions = same overlap groups)
           // Key must be font-specific; glyph ids/bounds differ between fonts
+          // Positions must match since overlap detection depends on relative glyph placement
           const cacheKey = `${this.cacheKeyPrefix}_${cluster.text}`;
           const cached = this.clusteringCache.get(cacheKey);
 
@@ -214,7 +215,13 @@ export class GlyphGeometryBuilder {
           if (cached && cached.glyphIds.length === cluster.glyphs.length) {
             isValid = true;
             for (let i = 0; i < cluster.glyphs.length; i++) {
-              if (cached.glyphIds[i] !== cluster.glyphs[i].g) {
+              const glyph = cluster.glyphs[i];
+              const cachedPos = cached.positions[i];
+              if (
+                cached.glyphIds[i] !== glyph.g ||
+                cachedPos.x !== (glyph.x ?? 0) ||
+                cachedPos.y !== (glyph.y ?? 0)
+              ) {
                 isValid = false;
                 break;
               }
@@ -234,23 +241,53 @@ export class GlyphGeometryBuilder {
 
             this.clusteringCache.set(cacheKey, {
               glyphIds: cluster.glyphs.map((g) => g.g),
+              positions: cluster.glyphs.map((g) => ({
+                x: g.x ?? 0,
+                y: g.y ?? 0
+              })),
               groups: boundaryGroups
             });
           }
         }
 
-        const clusterHasColoredGlyphs =
-          coloredTextIndices &&
-          cluster.glyphs.some((g) =>
-            coloredTextIndices.has(g.absoluteTextIndex)
-          );
+        // Only force separate tessellation when explicitly requested via separateGlyphs
+        const forceSeparate = separateGlyphs;
 
-        // Use glyph-level caching when separateGlyphs is set or when cluster contains colored text
-        const forceSeparate = separateGlyphs || clusterHasColoredGlyphs;
+        // Split boundary groups so colored and non-colored glyphs don't merge together
+        // This preserves overlap removal within each color class while keeping
+        // geometry separate for accurate vertex coloring
+        let finalGroups = boundaryGroups;
+        if (coloredTextIndices && coloredTextIndices.size > 0) {
+          finalGroups = [];
+          for (const group of boundaryGroups) {
+            if (group.length <= 1) {
+              finalGroups.push(group);
+            } else {
+              // Split group into colored and non-colored sub-groups
+              const coloredIndices: number[] = [];
+              const nonColoredIndices: number[] = [];
+              for (const idx of group) {
+                const glyph = cluster.glyphs[idx];
+                if (coloredTextIndices.has(glyph.absoluteTextIndex)) {
+                  coloredIndices.push(idx);
+                } else {
+                  nonColoredIndices.push(idx);
+                }
+              }
+              // Add non-empty sub-groups
+              if (coloredIndices.length > 0) {
+                finalGroups.push(coloredIndices);
+              }
+              if (nonColoredIndices.length > 0) {
+                finalGroups.push(nonColoredIndices);
+              }
+            }
+          }
+        }
 
         // Iterate over the geometric groups identified by BoundaryClusterer
         // logical groups (words) split into geometric sub-groups
-        for (const groupIndices of boundaryGroups) {
+        for (const groupIndices of finalGroups) {
           const isOverlappingGroup = groupIndices.length > 1;
           const shouldCluster = isOverlappingGroup && !forceSeparate;
 

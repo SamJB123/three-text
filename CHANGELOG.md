@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.5] - 2025-12-30
+
+### Fixed
+
+- `GlyphGeometryBuilder`:
+  - Clustering cache fixes glyph positions; a regression caused incorrect overlap groups when positioning changed between renders
+  - Colored glyphs now get proper overlap removal by keeping colored and non-colored glyphs in separate sub-clusters
+
 ## [0.3.4] - 2025-12-30
 
 ### Fixed

@@ -110,7 +110,6 @@
     "libtess": "^1.2.2"
   },
   "devDependencies": {
-    "@webgpu/types": "^0.1.64",
     "@react-three/fiber": ">=8.0.0",
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
@@ -120,6 +119,7 @@
     "@types/libtess": "^1.2.0",
     "@types/react": ">=17.0.0",
     "@types/three": ">=0.175.0",
+    "@webgpu/types": "^0.1.64",
     "http-server": "^14.1.1",
     "jsdom": "^26.1.0",
     "prettier": "^3.6.2",
