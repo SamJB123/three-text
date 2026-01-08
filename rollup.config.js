@@ -89,7 +89,19 @@ const reservedProps = [
   'path',
   'query',
   'stats',
-  'faces'
+  'faces',
+  // Curve fidelity / geometry optimization
+  'curveSteps',
+  'curveFidelity',
+  'distanceTolerance',
+  'angleTolerance',
+  'geometryOptimization',
+  'areaThreshold',
+  'enabled',
+  'pointsRemovedByVisvalingam',
+  'originalPointCount',
+  'trianglesGenerated',
+  'verticesGenerated'
 ];
 
 const terserOptions = {

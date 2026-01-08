@@ -304,8 +304,6 @@
           backgroundColor: "#111111",
           optimizationEnabled: true,
           areaThreshold: 1.0,
-          colinearThreshold: 0.0087,
-          minSegmentLength: 0.25,
           removeOverlaps: null,
 
           waveSpeed: 1.0,
@@ -341,6 +339,8 @@
           linepenalty: 10,
           adjdemerits: 10000,
           respectExistingBreaks: true,
+          curveMode: "adaptive",
+          curveSteps: 100,
           distanceTolerance: 0.5,
           angleTolerance: 0.25,
         };
@@ -870,6 +870,10 @@
                 }
               }
             });
+          textFolder
+            .add(params, "removeOverlaps", { "Auto (VF=on, Static=off)": null, "Force On": true, "Force Off": false })
+            .name("Overlap removal")
+            .onChange(debouncedRender);
 
           const animationFolder = gui.addFolder("Animation");
           animationFolder
@@ -993,36 +997,58 @@
             .name("Double hyphen demerits")
             .onChange(debouncedRender);
 
-          const flatteningFolder = gui.addFolder("Curve fidelity");
-          flatteningFolder
-            .add(params, "distanceTolerance", 0.1, 10.0, 0.1)
+          const curveFolder = gui.addFolder("Curve fidelity");
+          const curveFolders = {};
+
+          curveFolder
+            .add(params, "curveMode", {
+              "Adaptive (tolerances)": "adaptive",
+              "Fixed steps": "steps",
+            })
+            .name("Mode")
+            .onChange((mode) => {
+              updateCurveFolderVisibility(mode);
+              debouncedRender();
+            });
+
+          curveFolders.adaptive = curveFolder.addFolder("Adaptive");
+          curveFolders.adaptive
+            .add(params, "distanceTolerance", 0.01, 15.0, 0.01)
             .name("Distance tolerance")
             .onChange(debouncedRender);
-          flatteningFolder
+          curveFolders.adaptive
             .add(params, "angleTolerance", 0.1, 10.0, 0.05)
             .name("Angle tolerance")
             .onChange(debouncedRender);
 
+          curveFolders.steps = curveFolder.addFolder("Fixed steps");
+          curveFolders.steps
+            .add(params, "curveSteps", 1, 256, 1)
+            .name("Segments per curve")
+            .onChange(debouncedRender);
+
+          function updateCurveFolderVisibility(mode) {
+            Object.keys(curveFolders).forEach((key) => {
+              if (curveFolders[key]) {
+                if (key === mode) {
+                  curveFolders[key].show();
+                } else {
+                  curveFolders[key].hide();
+                }
+              }
+            });
+          }
+
+          updateCurveFolderVisibility(params.curveMode);
+
           const optimizationFolder = gui.addFolder("Geometry optimization");
           optimizationFolder
             .add(params, "optimizationEnabled")
-            .name("Enable V-W optimization")
+            .name("V-W optimization")
             .onChange(debouncedRender);
           optimizationFolder
             .add(params, "areaThreshold", 0.1, 15.0, 0.1)
             .name("V-W area threshold (font units²)")
-            .onChange(debouncedRender);
-          optimizationFolder
-            .add(params, "colinearThreshold", 0.001, 0.02, 0.0001)
-            .name("Colinear threshold (rad)")
-            .onChange(debouncedRender);
-          optimizationFolder
-            .add(params, "minSegmentLength", 0.1, 2.0, 0.05)
-            .name("Min segment length")
-            .onChange(debouncedRender);
-          optimizationFolder
-            .add(params, "removeOverlaps", { "Auto (VF=on, Static=off)": null, "Force On": true, "Force Off": false })
-            .name("Overlap removal")
             .onChange(debouncedRender);
         }
 
@@ -1277,6 +1303,7 @@
                 fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
                 removeOverlaps: params.removeOverlaps,
                 perGlyphAttributes: needsGlyphAttributes,
+                curveSteps: params.curveMode === "steps" ? params.curveSteps : 0,
                 curveFidelity: {
                   distanceTolerance: params.distanceTolerance,
                   angleTolerance: params.angleTolerance,
@@ -1284,8 +1311,6 @@
                 geometryOptimization: {
                   enabled: params.optimizationEnabled,
                   areaThreshold: params.areaThreshold,
-                  colinearThreshold: params.colinearThreshold,
-                  minSegmentLength: params.minSegmentLength,
                 },
                 layout: {
                   width: params.lineWidth,
@@ -1321,6 +1346,7 @@
                 fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
                 removeOverlaps: params.removeOverlaps,
                 perGlyphAttributes: needsGlyphAttributes,
+                curveSteps: params.curveMode === "steps" ? params.curveSteps : 0,
                 curveFidelity: {
                   distanceTolerance: params.distanceTolerance,
                   angleTolerance: params.angleTolerance,
@@ -1328,8 +1354,6 @@
                 geometryOptimization: {
                   enabled: params.optimizationEnabled,
                   areaThreshold: params.areaThreshold,
-                  colinearThreshold: params.colinearThreshold,
-                  minSegmentLength: params.minSegmentLength,
                 },
                 layout: {
                   width: params.lineWidth,

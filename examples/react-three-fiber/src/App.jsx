@@ -129,6 +129,15 @@ function App() {
         depth: { value: 7, min: 0, max: 50, step: 1 },
         color: { value: "#ffffff" },
         backgroundColor: { value: "#111111" },
+        wireframe: false,
+        removeOverlaps: { 
+          value: null, 
+          options: { 
+            "Auto (VF=on, Static=off)": null, 
+            "Force On": true, 
+            "Force Off": false 
+          } 
+        },
       };
 
       if (!availableFeatures || !Array.isArray(availableFeatures) || availableFeatures.length === 0) {
@@ -223,6 +232,8 @@ function App() {
   });
 
   const tessellationControls = useControls("Curve fidelity", {
+    curveMode: { value: "adaptive", options: ["adaptive", "steps"] },
+    curveSteps: { value: 100, min: 1, max: 256, step: 1, label: "Segments per curve" },
     distanceTolerance: { value: 0.5, min: 0.1, max: 10.0, step: 0.1 },
     angleTolerance: { value: 0.25, min: 0.1, max: 10.0, step: 0.05 },
   });
@@ -232,22 +243,11 @@ function App() {
     () => ({
       optimizationEnabled: true,
       areaThreshold: { value: 1.0, min: 0.1, max: 15.0, step: 0.1 },
-      colinearThreshold: { value: 0.0087, min: 0.001, max: 0.02, step: 0.0001 },
-      minSegmentLength: { value: 0.25, min: 0.1, max: 2.0, step: 0.05 },
-      removeOverlaps: { 
-        value: null, 
-        options: { 
-          "Auto (VF=on, Static=off)": null, 
-          "Force On": true, 
-          "Force Off": false 
-        } 
-      },
     }),
     [variationAxes]
   );
 
   const animationControls = useControls("Animation", {
-    wireframe: false,
     shaderMode: { value: 'wave', options: ['off', 'wave', 'flip', 'explode', 'orbit', 'twister'] },
   });
 
@@ -291,7 +291,7 @@ function App() {
       vertexColors: true,
       side: textControls.depth === 0 ? THREE.DoubleSide : THREE.FrontSide,
       transparent: true,
-      wireframe: animationControls.wireframe,
+      wireframe: textControls.wireframe,
       defines: { USE_COLOR: "" },
     };
 
@@ -385,7 +385,7 @@ function App() {
     });
   }, [
     animationControls.shaderMode,
-    animationControls.wireframe,
+    textControls.wireframe,
     textControls.depth,
     waveControls.waveHeight,
     waveControls.waveFrequency,
@@ -565,8 +565,9 @@ function App() {
           lineHeight={lineBreakingControls.lineHeight}
           letterSpacing={textControls.letterSpacing}
           color={resolvedColor}
-          removeOverlaps={optimizationControls.removeOverlaps}
+          removeOverlaps={textControls.removeOverlaps}
           perGlyphAttributes={['flip', 'explode', 'orbit', 'twister'].includes(animationControls.shaderMode)}
+          curveSteps={tessellationControls.curveMode === 'steps' ? tessellationControls.curveSteps : 0}
           curveFidelity={{
             distanceTolerance: tessellationControls.distanceTolerance,
             angleTolerance: tessellationControls.angleTolerance,
@@ -574,8 +575,6 @@ function App() {
           geometryOptimization={{
             enabled: optimizationControls.optimizationEnabled,
             areaThreshold: optimizationControls.areaThreshold,
-            colinearThreshold: optimizationControls.colinearThreshold,
-            minSegmentLength: optimizationControls.minSegmentLength,
           }}
           layout={{
             width: lineBreakingControls.lineWidth,

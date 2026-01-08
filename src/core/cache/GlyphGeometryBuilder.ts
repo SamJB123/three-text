@@ -47,6 +47,7 @@ export class GlyphGeometryBuilder {
   private fontId: string = 'default';
   private cacheKeyPrefix: string = 'default';
   private curveFidelityConfig?: CurveFidelityConfig;
+  private curveSteps?: number;
   private geometryOptimizationOptions?: GeometryOptimizationOptions;
   private clusterer: BoundaryClusterer;
   private collector: GlyphContourCollector;
@@ -84,6 +85,21 @@ export class GlyphGeometryBuilder {
     this.updateCacheKeyPrefix();
   }
 
+  public setCurveSteps(curveSteps?: number): void {
+    // Normalize: unset for undefined/null/non-finite/<=0
+    if (curveSteps === undefined || curveSteps === null) {
+      this.curveSteps = undefined;
+    } else if (!Number.isFinite(curveSteps)) {
+      this.curveSteps = undefined;
+    } else {
+      const stepsInt = Math.round(curveSteps);
+      this.curveSteps = stepsInt >= 1 ? stepsInt : undefined;
+    }
+
+    this.collector.setCurveSteps(this.curveSteps);
+    this.updateCacheKeyPrefix();
+  }
+
   public setGeometryOptimization(options?: GeometryOptimizationOptions): void {
     this.geometryOptimizationOptions = options;
     this.collector.setGeometryOptimization(options);
@@ -100,12 +116,20 @@ export class GlyphGeometryBuilder {
   }
 
   private getGeometryConfigSignature(): string {
-    const distanceTolerance =
-      this.curveFidelityConfig?.distanceTolerance ??
-      DEFAULT_CURVE_FIDELITY.distanceTolerance!;
-    const angleTolerance =
-      this.curveFidelityConfig?.angleTolerance ??
-      DEFAULT_CURVE_FIDELITY.angleTolerance!;
+    const curveSignature = (() => {
+      if (this.curveSteps !== undefined) {
+        return `cf:steps:${this.curveSteps}`;
+      }
+
+      const distanceTolerance =
+        this.curveFidelityConfig?.distanceTolerance ??
+        DEFAULT_CURVE_FIDELITY.distanceTolerance!;
+      const angleTolerance =
+        this.curveFidelityConfig?.angleTolerance ??
+        DEFAULT_CURVE_FIDELITY.angleTolerance!;
+
+      return `cf:${distanceTolerance.toFixed(4)},${angleTolerance.toFixed(4)}`;
+    })();
 
     const enabled =
       this.geometryOptimizationOptions?.enabled ??
@@ -113,19 +137,11 @@ export class GlyphGeometryBuilder {
     const areaThreshold =
       this.geometryOptimizationOptions?.areaThreshold ??
       DEFAULT_OPTIMIZATION_CONFIG.areaThreshold;
-    const colinearThreshold =
-      this.geometryOptimizationOptions?.colinearThreshold ??
-      DEFAULT_OPTIMIZATION_CONFIG.colinearThreshold;
-    const minSegmentLength =
-      this.geometryOptimizationOptions?.minSegmentLength ??
-      DEFAULT_OPTIMIZATION_CONFIG.minSegmentLength;
 
     // Use fixed precision to keep cache keys stable and avoid float noise
     return [
-      `cf:${distanceTolerance.toFixed(4)},${angleTolerance.toFixed(4)}`,
-      `opt:${enabled ? 1 : 0},${areaThreshold.toFixed(4)},${colinearThreshold.toFixed(
-        6
-      )},${minSegmentLength.toFixed(4)}`
+      curveSignature,
+      `opt:${enabled ? 1 : 0},${areaThreshold.toFixed(4)}`
     ].join('|');
   }
 

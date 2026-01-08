@@ -267,6 +267,10 @@ export class GlyphContourCollector {
     this.polygonizer.setCurveFidelityConfig(config);
   }
 
+  public setCurveSteps(curveSteps?: number): void {
+    this.polygonizer.setCurveSteps(curveSteps);
+  }
+
   public setGeometryOptimization(options?: GeometryOptimizationOptions): void {
     this.pathOptimizer.setConfig({
       ...DEFAULT_OPTIMIZATION_CONFIG,

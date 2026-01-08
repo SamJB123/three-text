@@ -350,7 +350,16 @@ export class Text {
         this.geometryBuilder.setFontId(this.currentFontId);
       }
 
-      this.geometryBuilder.setCurveFidelityConfig(options.curveFidelity);
+      // Curve flattening: either use fixed-step De Casteljau (`curveSteps`) OR
+      // adaptive AGG-style tolerances (`curveFidelity`)
+      const useCurveSteps =
+        options.curveSteps !== undefined &&
+        options.curveSteps !== null &&
+        options.curveSteps > 0;
+      this.geometryBuilder.setCurveSteps(options.curveSteps);
+      this.geometryBuilder.setCurveFidelityConfig(
+        useCurveSteps ? undefined : options.curveFidelity
+      );
       this.geometryBuilder.setGeometryOptimization(
         options.geometryOptimization
       );
@@ -870,7 +879,6 @@ export class Text {
         verticesGenerated,
         pointsRemovedByVisvalingam:
           optimizationStats.pointsRemovedByVisvalingam,
-        pointsRemovedByColinear: optimizationStats.pointsRemovedByColinear,
         originalPointCount: optimizationStats.originalPointCount
       },
       query: (() => {

@@ -54,6 +54,7 @@ vi.mock('../src/core/cache/GlyphContourCollector', () => {
         setPosition: vi.fn(),
         updatePosition: vi.fn(),
         setCurveFidelityConfig: vi.fn(),
+        setCurveSteps: vi.fn(),
         setGeometryOptimization: vi.fn(),
         moveTo: vi.fn(),
         lineTo: vi.fn(),
@@ -63,7 +64,6 @@ vi.mock('../src/core/cache/GlyphContourCollector', () => {
         getLineInfo: vi.fn().mockReturnValue({ lines: 2 }),
         getOptimizationStats: vi.fn().mockReturnValue({
           pointsRemovedByVisvalingam: 50,
-          pointsRemovedByColinear: 10,
           originalPointCount: 200
         })
       };
@@ -171,10 +171,10 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
     GlyphGeometryBuilder: vi.fn().mockImplementation(() => ({
       setFontId: vi.fn(),
       setCurveFidelityConfig: vi.fn(),
+      setCurveSteps: vi.fn(),
       setGeometryOptimization: vi.fn(),
       getOptimizationStats: vi.fn().mockReturnValue({
         pointsRemovedByVisvalingam: 5,
-        pointsRemovedByColinear: 2,
         originalPointCount: 100
       }),
       buildInstancedGeometry: vi.fn((clustersByLine, depth, removeOverlaps, isCFF, scale) => {
@@ -287,9 +287,7 @@ describe('Text Library', () => {
     it('removes redundant vertices', () => {
       const optimizer = new PathOptimizer({
         enabled: true,
-        areaThreshold: 1.0,
-        colinearThreshold: 0.01,
-        minSegmentLength: 0.5
+        areaThreshold: 1.0
       });
 
       const input = {
@@ -518,7 +516,7 @@ describe('Text Library', () => {
       const optimized = await Text.create({
         font: buffer,
         text: 'O',
-        geometryOptimization: { areaThreshold: 0.5, colinearThreshold: 0.01 }
+        geometryOptimization: { areaThreshold: 0.5 }
       });
       const unoptimized = await Text.create({
         font: buffer,

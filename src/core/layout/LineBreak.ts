@@ -77,7 +77,7 @@ interface BreakNode {
   activeIndex: number;     // index in activeList for O(1) removal
 }
 
-// Fast active node management with O(1) operations
+// Active node management with Map for O(1) lookup by (position, fitness)
 class ActiveNodeList {
   private nodesByKey: Map<number, BreakNode> = new Map();
   private activeList: BreakNode[] = [];
@@ -94,8 +94,8 @@ class ActiveNodeList {
     if (existing) {
       // Update existing if new one is better
       if (node.totalDemerits < existing.totalDemerits) {
-      existing.totalDemerits = node.totalDemerits;
-      existing.previous = node.previous;
+        existing.totalDemerits = node.totalDemerits;
+        existing.previous = node.previous;
         existing.hyphenated = node.hyphenated;
         existing.line = node.line;
         return true;
@@ -111,22 +111,21 @@ class ActiveNodeList {
     return true;
   }
 
-  // Swap-and-pop removal
   deactivate(node: BreakNode): void {
     if (!node.active) return;
-      node.active = false;
+    node.active = false;
 
     const idx = node.activeIndex;
     const lastIdx = this.activeList.length - 1;
 
     if (idx !== lastIdx) {
       const lastNode = this.activeList[lastIdx];
-        this.activeList[idx] = lastNode;
+      this.activeList[idx] = lastNode;
       lastNode.activeIndex = idx;
-      }
-
-      this.activeList.pop();
     }
+
+    this.activeList.pop();
+  }
 
   getActive(): BreakNode[] {
     return this.activeList;
@@ -351,42 +350,69 @@ export class LineBreak {
     if (code === undefined) return false;
 
     return (
-      (code >= 0x4e00 && code <= 0x9fff) ||
-      (code >= 0x3400 && code <= 0x4dbf) ||
-      (code >= 0x20000 && code <= 0x2a6df) ||
-      (code >= 0x2a700 && code <= 0x2b73f) ||
-      (code >= 0x2b740 && code <= 0x2b81f) ||
-      (code >= 0x2b820 && code <= 0x2ceaf) ||
-      (code >= 0xf900 && code <= 0xfaff) ||
-      (code >= 0x3040 && code <= 0x309f) ||
-      (code >= 0x30a0 && code <= 0x30ff) ||
-      (code >= 0xac00 && code <= 0xd7af) ||
-      (code >= 0x1100 && code <= 0x11ff) ||
-      (code >= 0x3130 && code <= 0x318f) ||
-      (code >= 0xa960 && code <= 0xa97f) ||
-      (code >= 0xd7b0 && code <= 0xd7ff) ||
-      (code >= 0xffa0 && code <= 0xffdc)
+      (code >= 0x4e00 && code <= 0x9fff) ||   // CJK Unified Ideographs
+      (code >= 0x3400 && code <= 0x4dbf) ||   // CJK Extension A
+      (code >= 0x20000 && code <= 0x2a6df) || // CJK Extension B
+      (code >= 0x2a700 && code <= 0x2b73f) || // CJK Extension C
+      (code >= 0x2b740 && code <= 0x2b81f) || // CJK Extension D
+      (code >= 0x2b820 && code <= 0x2ceaf) || // CJK Extension E
+      (code >= 0xf900 && code <= 0xfaff) ||   // CJK Compatibility Ideographs
+      (code >= 0x3040 && code <= 0x309f) ||   // Hiragana
+      (code >= 0x30a0 && code <= 0x30ff) ||   // Katakana
+      (code >= 0xac00 && code <= 0xd7af) ||   // Hangul Syllables
+      (code >= 0x1100 && code <= 0x11ff) ||   // Hangul Jamo
+      (code >= 0x3130 && code <= 0x318f) ||   // Hangul Compatibility Jamo
+      (code >= 0xa960 && code <= 0xa97f) ||   // Hangul Jamo Extended-A
+      (code >= 0xd7b0 && code <= 0xd7ff) ||   // Hangul Jamo Extended-B
+      (code >= 0xffa0 && code <= 0xffdc)      // Halfwidth Hangul
     );
   }
 
+  // Closing punctuation - no line break before (UAX #14 CL, JIS X 4051)
   public static isCJClosingPunctuation(char: string): boolean {
     const code = char.charCodeAt(0);
     return (
-      code === 0x3001 || code === 0x3002 || code === 0xff0c || code === 0xff0e ||
-      code === 0xff1a || code === 0xff1b || code === 0xff01 || code === 0xff1f ||
-      code === 0xff09 || code === 0x3011 || code === 0xff5d || code === 0x300d ||
-      code === 0x300f || code === 0x3009 || code === 0x300b || code === 0x3015 ||
-      code === 0x3017 || code === 0x3019 || code === 0x301b || code === 0x30fc ||
-      code === 0x2014 || code === 0x2026 || code === 0x2025
+      code === 0x3001 || // 、
+      code === 0x3002 || // 。
+      code === 0xff0c || // ，
+      code === 0xff0e || // ．
+      code === 0xff1a || // ：
+      code === 0xff1b || // ；
+      code === 0xff01 || // ！
+      code === 0xff1f || // ？
+      code === 0xff09 || // ）
+      code === 0x3011 || // 】
+      code === 0xff5d || // ｝
+      code === 0x300d || // 」
+      code === 0x300f || // 』
+      code === 0x3009 || // 〉
+      code === 0x300b || // 》
+      code === 0x3015 || // 〕
+      code === 0x3017 || // 〗
+      code === 0x3019 || // 〙
+      code === 0x301b || // 〛
+      code === 0x30fc || // ー
+      code === 0x2014 || // —
+      code === 0x2026 || // …
+      code === 0x2025    // ‥
     );
   }
 
+  // Opening punctuation - no line break after (UAX #14 OP, JIS X 4051)
   public static isCJOpeningPunctuation(char: string): boolean {
     const code = char.charCodeAt(0);
     return (
-      code === 0xff08 || code === 0x3010 || code === 0xff5b || code === 0x300c ||
-      code === 0x300e || code === 0x3008 || code === 0x300a || code === 0x3014 ||
-      code === 0x3016 || code === 0x3018 || code === 0x301a
+      code === 0xff08 || // （
+      code === 0x3010 || // 【
+      code === 0xff5b || // ｛
+      code === 0x300c || // 「
+      code === 0x300e || // 『
+      code === 0x3008 || // 〈
+      code === 0x300a || // 《
+      code === 0x3014 || // 〔
+      code === 0x3016 || // 〖
+      code === 0x3018 || // 〘
+      code === 0x301a    // 〚
     );
   }
 

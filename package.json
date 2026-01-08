@@ -1,6 +1,6 @@
 {
   "name": "three-text",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "description": "3D mesh font geometry and text layout engine for the web",
   "main": "dist/three/index.cjs",
   "module": "dist/three/index.js",
@@ -106,7 +106,7 @@
     }
   },
   "dependencies": {
-    "harfbuzzjs": "^0.4.11",
+    "harfbuzzjs": "^0.4.15",
     "libtess": "^1.2.2"
   },
   "devDependencies": {

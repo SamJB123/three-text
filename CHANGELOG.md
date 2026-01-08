@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0] - 2026-01-03
+
+### Breaking changes
+
+- Removed `colinearEnabled`, `colinearThreshold`, `minSegmentLength` from `GeometryOptimizationOptions`
+- Geometry optimization is now solely Visvalingam-Whyatt simplification
+
+### Added
+
+- `curveSteps` option for fixed-step De Casteljau curve polygonization; overrides adaptive `curveFidelity` when set
+
 ## [0.3.5] - 2025-12-30
 
 ### Fixed

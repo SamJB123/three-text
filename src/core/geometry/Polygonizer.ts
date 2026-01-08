@@ -49,6 +49,7 @@ const RECURSION_LIMIT = 16;
 
 export class Polygonizer {
   private curveFidelityConfig: CurveFidelityConfig;
+  private curveSteps: number | null = null;
 
   constructor(curveFidelityConfig?: CurveFidelityConfig) {
     this.curveFidelityConfig = {
@@ -64,7 +65,30 @@ export class Polygonizer {
     };
   }
 
+  // Fixed-step subdivision; overrides adaptive curveFidelity when set
+  public setCurveSteps(curveSteps?: number) {
+    if (curveSteps === undefined || curveSteps === null) {
+      this.curveSteps = null;
+      return;
+    }
+    if (!Number.isFinite(curveSteps)) {
+      this.curveSteps = null;
+      return;
+    }
+    const stepsInt = Math.round(curveSteps);
+    this.curveSteps = stepsInt >= 1 ? stepsInt : null;
+  }
+
   public polygonizeQuadratic(start: Vec2, control: Vec2, end: Vec2): Vec2[] {
+    if (this.curveSteps !== null) {
+      return this.polygonizeQuadraticFixedSteps(
+        start,
+        control,
+        end,
+        this.curveSteps
+      );
+    }
+
     const points: Vec2[] = [];
     this.recursiveQuadratic(
       start.x,
@@ -85,6 +109,16 @@ export class Polygonizer {
     control2: Vec2,
     end: Vec2
   ): Vec2[] {
+    if (this.curveSteps !== null) {
+      return this.polygonizeCubicFixedSteps(
+        start,
+        control1,
+        control2,
+        end,
+        this.curveSteps
+      );
+    }
+
     const points: Vec2[] = [];
     this.recursiveCubic(
       start.x,
@@ -98,6 +132,67 @@ export class Polygonizer {
       points
     );
     this.addPoint(end.x, end.y, points);
+    return points;
+  }
+
+  private lerp(a: number, b: number, t: number): number {
+    return a + (b - a) * t;
+  }
+
+  private polygonizeQuadraticFixedSteps(
+    start: Vec2,
+    control: Vec2,
+    end: Vec2,
+    steps: number
+  ): Vec2[] {
+    const points: Vec2[] = [];
+
+    // Emit intermediate points; caller already has start
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const x12 = this.lerp(start.x, control.x, t);
+      const y12 = this.lerp(start.y, control.y, t);
+      const x23 = this.lerp(control.x, end.x, t);
+      const y23 = this.lerp(control.y, end.y, t);
+      const x = this.lerp(x12, x23, t);
+      const y = this.lerp(y12, y23, t);
+      this.addPoint(x, y, points);
+    }
+
+    return points;
+  }
+
+  private polygonizeCubicFixedSteps(
+    start: Vec2,
+    control1: Vec2,
+    control2: Vec2,
+    end: Vec2,
+    steps: number
+  ): Vec2[] {
+    const points: Vec2[] = [];
+
+    // Emit intermediate points; caller already has start
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+
+      // De Casteljau
+      const x12 = this.lerp(start.x, control1.x, t);
+      const y12 = this.lerp(start.y, control1.y, t);
+      const x23 = this.lerp(control1.x, control2.x, t);
+      const y23 = this.lerp(control1.y, control2.y, t);
+      const x34 = this.lerp(control2.x, end.x, t);
+      const y34 = this.lerp(control2.y, end.y, t);
+
+      const x123 = this.lerp(x12, x23, t);
+      const y123 = this.lerp(y12, y23, t);
+      const x234 = this.lerp(x23, x34, t);
+      const y234 = this.lerp(y23, y34, t);
+
+      const x = this.lerp(x123, x234, t);
+      const y = this.lerp(y123, y234, t);
+      this.addPoint(x, y, points);
+    }
+
     return points;
   }
 
@@ -141,8 +236,8 @@ export class Polygonizer {
           this.curveFidelityConfig.angleTolerance ??
           DEFAULT_CURVE_FIDELITY.angleTolerance!;
         if (angleTolerance > 0) {
-          // Angle between segments (p1->p2) and (p2->p3).
-          // Using atan2(cross, dot) avoids computing 2 separate atan2() values + wrap logic.
+          // Angle between segments (p1->p2) and (p2->p3)
+          // atan2(cross, dot) avoids computing 2 separate atan2() values
           const v1x = x2 - x1;
           const v1y = y2 - y1;
           const v2x = x3 - x2;

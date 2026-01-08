@@ -235,7 +235,6 @@ export interface TextGeometryInfo {
     trianglesGenerated: number;
     verticesGenerated: number;
     pointsRemovedByVisvalingam: number;
-    pointsRemovedByColinear: number;
     originalPointCount: number;
   } & Partial<CacheStats & { hitRate: number; memoryUsageMB: number }>;
   query(options: TextQueryOptions): TextRange[];
@@ -287,6 +286,7 @@ export interface TextOptions {
   fontFeatures?: { [tag: string]: boolean | number };
   maxTextLength?: number;
   removeOverlaps?: boolean;
+  curveSteps?: number; // Fixed segments per curve; overrides curveFidelity when set
   curveFidelity?: CurveFidelityConfig;
   geometryOptimization?: GeometryOptimizationOptions;
   layout?: LayoutOptions;
@@ -303,10 +303,8 @@ export interface CurveFidelityConfig {
 }
 
 export interface GeometryOptimizationOptions {
-  enabled?: boolean;
-  areaThreshold?: number;
-  colinearThreshold?: number;
-  minSegmentLength?: number;
+  enabled?: boolean;      // Enable Visvalingam-Whyatt simplification (default: true)
+  areaThreshold?: number; // Min triangle area for Visvalingam-Whyatt (default: 1.0)
 }
 
 export interface LayoutOptions {

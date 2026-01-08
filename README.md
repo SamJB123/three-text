@@ -13,7 +13,7 @@ High fidelity 3D mesh font geometry and text layout engine for the web
 ## Overview
 
 > [!CAUTION]
-> three-text is an alpha release and the API may break rapidly. This warning will last at least through the end of 2025. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
+> three-text is an alpha release and the API may break rapidly. This warning will likely last until the end of March 2026. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
 **three-text** is a 3D mesh font geometry and text layout library for the web. It supports TTF, OTF, and WOFF font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
 
@@ -248,10 +248,10 @@ three-text generates high-fidelity 3D mesh geometry from font files. Unlike text
 Existing solutions take different approaches:
 
 - **Three.js native TextGeometry** uses fonts converted by facetype.js to JSON format. It creates 3D text by extruding flat 2D character outlines. While this produces true 3D geometry with depth, there is no support for real fonts or OpenType features needed for many of the world's scripts
-- **three-bmfont-text** is a 2D approach for Three.js, using pre-rendered bitmap fonts with SDF support. Texture atlases are generated at specific sizes, and artifacts are apparent up close
-- **troika-three-text** uses MSDF, which improves quality, and like three-text, it is built on HarfBuzz, which provides substantial language coverage, but is ultimately a 2D technique in image space. For flat text that does not need formatting or extrusion, and where artifacts are acceptable up close, troika works well
+- **three-bmfont-text** renders from pre-generated SDF atlas textures. Atlases are built offline at fixed sizes
+- **troika-three-text** generates SDF glyphs at runtime from font files via HarfBuzz. More flexible than bmfont, but still a 2D image-space technique with artifacts up close
 
-three-text generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than bitmap approaches when flat, and produces real mesh data that can be used with any rendering system. The library caches glyph geometry, so a paragraph of 1000 words might only require 50 unique glyphs to be processed. This makes it well-suited to longer texts. In addition to performance considerations, three-text provides control over typesetting and paragraph justification via TeX-based parameters
+three-text generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than bitmap approaches, and produces mesh data that can be used with any rendering system. The library caches glyph geometry, so a paragraph of 1000 words might only require 50 unique glyphs to be processed. This makes it well-suited to longer texts. three-text also provides control over typesetting and paragraph justification via TeX-based parameters
 
 ## Library structure
 
@@ -309,15 +309,14 @@ Hyphenation uses patterns derived from the Tex hyphenation project, converted in
 The geometry pipeline runs once per unique glyph (or glyph cluster), with intermediate results cached to avoid redundant work:
 
 1. **Path collection**: HarfBuzz callbacks provide low level drawing operations
-2. **Curve polygonization**: Uses Anti-Grain Geometry's recursive subdivision to convert bezier curves into polygons, concentrating points where curvature is high
+2. **Curve polygonization**: Flattens bezier curves into line segments, placing more points where curves are tight
 3. **Geometry optimization**:
-   - **Visvalingam-Whyatt simplification**: removes vertices that contribute the least to the overall shape, preserving sharp corners and subtle curves
-   - **Colinear point removal**: eliminates redundant points that lie on straight lines within angle tolerances
+   - **Visvalingam-Whyatt simplification**: removes vertices that form tiny triangles with their neighbors, smoothing out subtle bumps while preserving sharp corners
 4. **Overlap removal**: removes self-intersections and resolves overlapping paths between glyphs, preserving correct winding rules for triangulation
 5. **Triangulation**: converts cleaned 2D shapes into triangles using libtess2 with non-zero winding rule
 6. **Mesh construction**: generates 2D or 3D geometry with front faces and optional depth/extrusion (back faces and side walls)
 
-The multi-stage geometry approach (curve polygonization followed by cleanup, then triangulation) can reduce triangle counts while maintaining high visual fidelity and removing overlaps in variable fonts
+The multi-stage geometry approach (curve polygonization followed by cleanup, then triangulation) reduces triangle counts and removes overlaps in variable fonts
 
 #### Glyph caching
 
@@ -340,54 +339,49 @@ When `depth` is 0, the library generates single-sided geometry, reducing triangl
 
 ### Curve fidelity
 
-The library converts bezier curves into line segments by recursively subdividing curves until they meet specified quality thresholds. This is based on the AGG library, attempting to place vertices only where they are needed to maintain the integrity of the curve. You can control curve fidelity with `distanceTolerance` and `angleTolerance`
+Font outlines are bezier curves, but screens render curves flattened into many line segments. The library uses one of two modes:
 
-- `distanceTolerance`: The maximum allowed deviation of the curve from a straight line segment, measured in font units. Lower values produce higher fidelity and more vertices. Default is `0.5`, which is nearly imperceptable without extrusion
-- `angleTolerance`: The maximum angle in radians between segments at a join. This helps preserve sharp corners. Default is `0.2`
+**Adaptive (default)** - The algorithm splits each curve at its midpoint, checks if the resulting line segment is close enough to the true curve, and recurses until it is. Tight curves get more segments; gentle curves get fewer. Two tolerances control when to stop subdividing:
 
-In general, this step helps more with time to first render than ongoing interactions in the scene
+- `distanceTolerance`: how far the line segment can stray from the true curve, in font units. Lower values trace the curve more faithfully (default: `0.5`)
+- `angleTolerance`: the maximum angle between adjacent segments, in radians. Smaller values preserve sharp corners better (default: `0.2`)
+
+**Fixed-step** - Divides each curve into exactly `curveSteps` segments, regardless of curvature. Simpler and predictable. Overrides adaptive mode when set
 
 ```javascript
+// Adaptive (default)
 const text = await Text.create({
-  text: 'Sample text',
+  text: 'Sample',
   font: '/fonts/Font.ttf',
-  curveFidelity: {
+  curveFidelity: { 
     distanceTolerance: 0.2,
-    angleTolerance: 0.1,
+    angleTolerance: 0.1
   },
+});
+
+// Fixed-step: 8 segments per curve
+const text = await Text.create({
+  text: 'Sample',
+  font: '/fonts/Font.ttf',
+  curveSteps: 8,
 });
 ```
 
 ### Geometry optimization
 
-`three-text` uses a line simplification algorithm after creating lines to reduce the complexity of the shapes as well, which can be combined with `curveFidelity` for different types of control. It is enabled by default:
+After curve polygonization, the library applies Visvalingam-Whyatt simplification. Unlike curve flattening, which operates on each bezier independently, V-W sees the complete assembled path. The algorithm looks at each vertex and the triangle it forms with its two neighbors. Vertices that form tiny triangles - nearly collinear with their neighbors - are removed first. The process repeats until no triangle is smaller than `areaThreshold`, measured in square font units. Sharp corners form large triangles, so they survive; subtle bumps form small ones and get smoothed out:
 
-
-```javascript
-// Default optimization (automatic)
-const text = await Text.create({
-  text: 'Sample text',
-  font: '/fonts/Font.ttf',
-});
-
-// Custom optimization settings
 ```javascript
 const text = await Text.create({
   text: 'Sample text',
   font: '/fonts/Font.ttf',
   geometryOptimization: {
-    areaThreshold: 1.0,         // Default: 1.0 (remove triangles < 1 font unit²)
-    colinearThreshold: 0.0087,  // Default: ~0.5° in radians
-    minSegmentLength: 10,       // Default: 10 font units
+    areaThreshold: 1.0,  // remove triangles < 1 font unit²
   },
 });
 ```
 
-**The Visvalingam-Whyatt simplification** removes vertices whose removal creates triangles with area below the threshold
-
-**Colinear point removal** eliminates redundant vertices that lie on straight lines within the specified angle tolerance
-
-The default settings provide a significant reduction while maintaining high visual quality, but won't be perfect for every font. Adjust thresholds based on your quality requirements, performance constraints, and testing
+Defaults work well for most fonts. Adjust thresholds based on quality requirements and testing
 
 ### Line breaking parameters
 
@@ -740,6 +734,7 @@ interface TextOptions {
   removeOverlaps?: boolean; // Override default overlap removal (auto-enabled for VF only)
   perGlyphAttributes?: boolean; // Keep per-glyph identity and add per-glyph shader attributes
   color?: [number, number, number] | ColorOptions; // Text coloring (simple or complex)
+  curveSteps?: number; // Fixed segments per curve; overrides curveFidelity when set
   curveFidelity?: CurveFidelityConfig;
   geometryOptimization?: GeometryOptimizationOptions;
   layout?: LayoutOptions;
@@ -796,12 +791,10 @@ interface CurveFidelityConfig {
 
 ```typescript
 interface GeometryOptimizationOptions {
-  enabled?: boolean; // Enable geometry optimization (default: true)
-  areaThreshold?: number; // Min triangle area for Visvalingam-Whyatt (default: 1.0)
-  colinearThreshold?: number; // Max angle for colinear removal in radians (default: 0.0087)
-  minSegmentLength?: number; // Min segment length in font units (default: 10)
+  enabled?: boolean;      // Enable optimization (default: true)
+  areaThreshold?: number; // Min triangle area in font units² (default: 1.0)
 }
-````
+```
 
 #### TextGeometryInfo (Core)
 
@@ -827,7 +820,6 @@ interface TextGeometryInfo {
     trianglesGenerated: number;
     verticesGenerated: number;
     pointsRemovedByVisvalingam: number;
-    pointsRemovedByColinear: number;
     originalPointCount: number;
   };
   query(options: TextQueryOptions): TextRange[];
