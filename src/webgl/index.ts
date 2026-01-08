@@ -96,7 +96,11 @@ export function createWebGLBuffers(
     if (!glyphLineIndexBuffer)
       throw new Error('Failed to create glyphLineIndex buffer');
     gl.bindBuffer(gl.ARRAY_BUFFER, glyphLineIndexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphLineIndex, gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      glyphAttributes.glyphLineIndex,
+      gl.STATIC_DRAW
+    );
     buffers.glyphLineIndex = glyphLineIndexBuffer;
     attributes.glyphLineIndex = { size: 1, type: gl.FLOAT, normalized: false };
 
@@ -104,7 +108,11 @@ export function createWebGLBuffers(
     if (!glyphProgressBuffer)
       throw new Error('Failed to create glyphProgress buffer');
     gl.bindBuffer(gl.ARRAY_BUFFER, glyphProgressBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphProgress, gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      glyphAttributes.glyphProgress,
+      gl.STATIC_DRAW
+    );
     buffers.glyphProgress = glyphProgressBuffer;
     attributes.glyphProgress = { size: 1, type: gl.FLOAT, normalized: false };
 
@@ -112,7 +120,11 @@ export function createWebGLBuffers(
     if (!glyphBaselineYBuffer)
       throw new Error('Failed to create glyphBaselineY buffer');
     gl.bindBuffer(gl.ARRAY_BUFFER, glyphBaselineYBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphBaselineY, gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      glyphAttributes.glyphBaselineY,
+      gl.STATIC_DRAW
+    );
     buffers.glyphBaselineY = glyphBaselineYBuffer;
     attributes.glyphBaselineY = { size: 1, type: gl.FLOAT, normalized: false };
   }

@@ -103,14 +103,20 @@ function extractHyphenminsFromTexFile(languageCode) {
           }
 
           // Exit if we've found both values or hit a non-comment line
-          if ((left !== null && right !== null) ||
-              (!line.startsWith('%') && line.trim().length > 0)) {
+          if (
+            (left !== null && right !== null) ||
+            (!line.startsWith('%') && line.trim().length > 0)
+          ) {
             break;
           }
         }
 
         // Exit hyphenmins block if we hit a different section
-        if (line.startsWith('% ') && !line.startsWith('%     ') && !line.startsWith('% hyphenmins:')) {
+        if (
+          line.startsWith('% ') &&
+          !line.startsWith('%     ') &&
+          !line.startsWith('% hyphenmins:')
+        ) {
           break;
         }
       }
@@ -346,7 +352,9 @@ for (const patternFile of patternFiles) {
 
     // Extract hyphenmin values from the .tex file
     const hyphenmins = extractHyphenminsFromTexFile(language);
-    console.log(`  Hyphenmins for ${language}: left=${hyphenmins.left}, right=${hyphenmins.right}`);
+    console.log(
+      `  Hyphenmins for ${language}: left=${hyphenmins.left}, right=${hyphenmins.right}`
+    );
 
     const fileLicenseHeader = getLicenseHeader(language, languageDetails.name);
 

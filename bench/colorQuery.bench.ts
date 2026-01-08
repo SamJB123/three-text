@@ -120,7 +120,11 @@ describe('Color/Query Performance', () => {
           byCharRange: Array.from({ length: 10 }, (_, i) => ({
             start: i * 400,
             end: i * 400 + 50,
-            color: [Math.random(), Math.random(), Math.random()] as [number, number, number]
+            color: [Math.random(), Math.random(), Math.random()] as [
+              number,
+              number,
+              number
+            ]
           }))
         }
       });
@@ -179,4 +183,3 @@ describe('Color/Query Performance', () => {
     });
   });
 });
-

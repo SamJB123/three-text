@@ -19,18 +19,18 @@ import type {
 } from '../types';
 
 export enum ItemType {
-  BOX,            // character or word with fixed width
-  GLUE,           // stretchable/shrinkable space
-  PENALTY,        // potential breakpoint with penalty cost
-  DISCRETIONARY   // hyphenation point with pre/post/no-break forms
+  BOX, // character or word with fixed width
+  GLUE, // stretchable/shrinkable space
+  PENALTY, // potential breakpoint with penalty cost
+  DISCRETIONARY // hyphenation point with pre/post/no-break forms
 }
 
 // TeX fitness classes (tex.web lines 16099-16105)
 export enum FitnessClass {
   VERY_LOOSE = 0, // lines stretching more than their stretchability
-  LOOSE = 1,      // lines stretching 0.5 to 1.0 of their stretchability
-  DECENT = 2,     // all other lines
-  TIGHT = 3       // lines shrinking 0.5 to 1.0 of their shrinkability
+  LOOSE = 1, // lines stretching 0.5 to 1.0 of their stretchability
+  DECENT = 2, // all other lines
+  TIGHT = 3 // lines shrinking 0.5 to 1.0 of their shrinkability
 }
 
 interface Item {
@@ -46,35 +46,35 @@ export interface Box extends Item {
 
 export interface Glue extends Item {
   type: ItemType.GLUE;
-  stretch: number;  // amount the space can grow
-  shrink: number;   // amount the space can compress
+  stretch: number; // amount the space can grow
+  shrink: number; // amount the space can compress
 }
 
 export interface Penalty extends Item {
   type: ItemType.PENALTY;
-  penalty: number;    // cost of breaking here (10000 = infinity)
-  flagged?: boolean;  // marks consecutive hyphenated lines
+  penalty: number; // cost of breaking here (10000 = infinity)
+  flagged?: boolean; // marks consecutive hyphenated lines
 }
 
 export interface Discretionary extends Item {
   type: ItemType.DISCRETIONARY;
-  preBreak: string;       // text before break (e.g., hyphen)
-  postBreak: string;      // text after break (usually empty)
-  noBreak: string;        // text if no break (usually empty)
-  preBreakWidth: number;  // width of preBreak text
-  penalty: number;        // cost of breaking here
-  flagged?: boolean;      // marks consecutive hyphenated lines
+  preBreak: string; // text before break (e.g., hyphen)
+  postBreak: string; // text after break (usually empty)
+  noBreak: string; // text if no break (usually empty)
+  preBreakWidth: number; // width of preBreak text
+  penalty: number; // cost of breaking here
+  flagged?: boolean; // marks consecutive hyphenated lines
 }
 
 interface BreakNode {
-  position: number;        // position in item list
-  line: number;            // line number
-  fitness: FitnessClass;   // fitness class of this line
-  totalDemerits: number;   // accumulated demerits from start
-  previous: BreakNode | null;  // previous break in solution
-  hyphenated: boolean;     // whether this line ends with hyphen
-  active: boolean;         // whether node is still viable
-  activeIndex: number;     // index in activeList for O(1) removal
+  position: number; // position in item list
+  line: number; // line number
+  fitness: FitnessClass; // fitness class of this line
+  totalDemerits: number; // accumulated demerits from start
+  previous: BreakNode | null; // previous break in solution
+  hyphenated: boolean; // whether this line ends with hyphen
+  active: boolean; // whether node is still viable
+  activeIndex: number; // index in activeList for O(1) removal
 }
 
 // Active node management with Map for O(1) lookup by (position, fitness)
@@ -176,19 +176,19 @@ interface LineBreakContext {
 }
 
 // TeX parameters (tex.web lines 4934-4936, 4997-4999)
-const DEFAULT_HYPHEN_PENALTY = 50;        // \hyphenpenalty
-const DEFAULT_EX_HYPHEN_PENALTY = 50;     // \exhyphenpenalty
+const DEFAULT_HYPHEN_PENALTY = 50; // \hyphenpenalty
+const DEFAULT_EX_HYPHEN_PENALTY = 50; // \exhyphenpenalty
 const DEFAULT_DOUBLE_HYPHEN_DEMERITS = 10000; // \doublehyphendemerits
-const DEFAULT_FINAL_HYPHEN_DEMERITS = 5000;   // \finalhyphendemerits
-const DEFAULT_LINE_PENALTY = 10;          // \linepenalty
-const DEFAULT_FITNESS_DIFF_DEMERITS = 10000;  // \adjdemerits
-const DEFAULT_LEFT_HYPHEN_MIN = 2;        // \lefthyphenmin
-const DEFAULT_RIGHT_HYPHEN_MIN = 3;       // \righthyphenmin
+const DEFAULT_FINAL_HYPHEN_DEMERITS = 5000; // \finalhyphendemerits
+const DEFAULT_LINE_PENALTY = 10; // \linepenalty
+const DEFAULT_FITNESS_DIFF_DEMERITS = 10000; // \adjdemerits
+const DEFAULT_LEFT_HYPHEN_MIN = 2; // \lefthyphenmin
+const DEFAULT_RIGHT_HYPHEN_MIN = 3; // \righthyphenmin
 
 // TeX special values (tex.web lines 2335, 3258, 3259)
-const INF_BAD = 10000;           // inf_bad - infinitely bad badness
-const INFINITY_PENALTY = 10000;  // inf_penalty - never break here
-const EJECT_PENALTY = -10000;    // eject_penalty - force break here
+const INF_BAD = 10000; // inf_bad - infinitely bad badness
+const INFINITY_PENALTY = 10000; // inf_penalty - never break here
+const EJECT_PENALTY = -10000; // eject_penalty - force break here
 
 // Retry increment when no breakpoints found
 const EMERGENCY_STRETCH_INCREMENT = 0.1;
@@ -216,10 +216,10 @@ export class LineBreak {
 
   // TeX fitness classification (tex.web lines 16796-16812)
   private static fitnessClass(ratio: number): FitnessClass {
-    if (ratio < -0.5) return FitnessClass.TIGHT;      // shrinking significantly
-    if (ratio < 0.5) return FitnessClass.DECENT;      // normal
-    if (ratio < 1) return FitnessClass.LOOSE;         // stretching 0.5-1.0
-    return FitnessClass.VERY_LOOSE;                   // stretching > 1.0
+    if (ratio < -0.5) return FitnessClass.TIGHT; // shrinking significantly
+    if (ratio < 0.5) return FitnessClass.DECENT; // normal
+    if (ratio < 1) return FitnessClass.LOOSE; // stretching 0.5-1.0
+    return FitnessClass.VERY_LOOSE; // stretching > 1.0
   }
 
   // Build prefix sums so we can quickly compute the width/stretch/shrink
@@ -350,21 +350,21 @@ export class LineBreak {
     if (code === undefined) return false;
 
     return (
-      (code >= 0x4e00 && code <= 0x9fff) ||   // CJK Unified Ideographs
-      (code >= 0x3400 && code <= 0x4dbf) ||   // CJK Extension A
+      (code >= 0x4e00 && code <= 0x9fff) || // CJK Unified Ideographs
+      (code >= 0x3400 && code <= 0x4dbf) || // CJK Extension A
       (code >= 0x20000 && code <= 0x2a6df) || // CJK Extension B
       (code >= 0x2a700 && code <= 0x2b73f) || // CJK Extension C
       (code >= 0x2b740 && code <= 0x2b81f) || // CJK Extension D
       (code >= 0x2b820 && code <= 0x2ceaf) || // CJK Extension E
-      (code >= 0xf900 && code <= 0xfaff) ||   // CJK Compatibility Ideographs
-      (code >= 0x3040 && code <= 0x309f) ||   // Hiragana
-      (code >= 0x30a0 && code <= 0x30ff) ||   // Katakana
-      (code >= 0xac00 && code <= 0xd7af) ||   // Hangul Syllables
-      (code >= 0x1100 && code <= 0x11ff) ||   // Hangul Jamo
-      (code >= 0x3130 && code <= 0x318f) ||   // Hangul Compatibility Jamo
-      (code >= 0xa960 && code <= 0xa97f) ||   // Hangul Jamo Extended-A
-      (code >= 0xd7b0 && code <= 0xd7ff) ||   // Hangul Jamo Extended-B
-      (code >= 0xffa0 && code <= 0xffdc)      // Halfwidth Hangul
+      (code >= 0xf900 && code <= 0xfaff) || // CJK Compatibility Ideographs
+      (code >= 0x3040 && code <= 0x309f) || // Hiragana
+      (code >= 0x30a0 && code <= 0x30ff) || // Katakana
+      (code >= 0xac00 && code <= 0xd7af) || // Hangul Syllables
+      (code >= 0x1100 && code <= 0x11ff) || // Hangul Jamo
+      (code >= 0x3130 && code <= 0x318f) || // Hangul Compatibility Jamo
+      (code >= 0xa960 && code <= 0xa97f) || // Hangul Jamo Extended-A
+      (code >= 0xd7b0 && code <= 0xd7ff) || // Hangul Jamo Extended-B
+      (code >= 0xffa0 && code <= 0xffdc) // Halfwidth Hangul
     );
   }
 
@@ -394,7 +394,7 @@ export class LineBreak {
       code === 0x30fc || // ー
       code === 0x2014 || // —
       code === 0x2026 || // …
-      code === 0x2025    // ‥
+      code === 0x2025 // ‥
     );
   }
 
@@ -412,12 +412,14 @@ export class LineBreak {
       code === 0x3014 || // 〔
       code === 0x3016 || // 〖
       code === 0x3018 || // 〘
-      code === 0x301a    // 〚
+      code === 0x301a // 〚
     );
   }
 
   public static isCJPunctuation(char: string): boolean {
-    return this.isCJClosingPunctuation(char) || this.isCJOpeningPunctuation(char);
+    return (
+      this.isCJClosingPunctuation(char) || this.isCJOpeningPunctuation(char)
+    );
   }
 
   private static itemizeCJKText(
@@ -451,7 +453,9 @@ export class LineBreak {
       const nextChar = i < chars.length - 1 ? chars[i + 1] : null;
 
       if (/\s/.test(char)) {
-        const width = widths ? (widths[i] ?? measureText(char)) : measureText(char);
+        const width = widths
+          ? (widths[i] ?? measureText(char))
+          : measureText(char);
         items.push({
           type: ItemType.GLUE,
           width,
@@ -477,7 +481,8 @@ export class LineBreak {
         let canBreak = true;
         if (this.isCJClosingPunctuation(nextChar)) canBreak = false;
         if (this.isCJOpeningPunctuation(char)) canBreak = false;
-        const isPunctPair = this.isCJPunctuation(char) && this.isCJPunctuation(nextChar);
+        const isPunctPair =
+          this.isCJPunctuation(char) && this.isCJPunctuation(nextChar);
 
         if (canBreak && !isPunctPair) {
           items.push({
@@ -510,11 +515,17 @@ export class LineBreak {
     const items: Item[] = [];
     const chars = Array.from(text);
 
-    let cjkGlueParams: { width: number; stretch: number; shrink: number } | undefined;
+    let cjkGlueParams:
+      | { width: number; stretch: number; shrink: number }
+      | undefined;
     const getCjkGlueParams = () => {
       if (!cjkGlueParams) {
         const baseCharWidth = measureText('字');
-        cjkGlueParams = { width: 0, stretch: baseCharWidth * 0.04, shrink: baseCharWidth * 0.04 };
+        cjkGlueParams = {
+          width: 0,
+          stretch: baseCharWidth * 0.04,
+          shrink: baseCharWidth * 0.04
+        };
       }
       return cjkGlueParams;
     };
@@ -528,9 +539,31 @@ export class LineBreak {
       if (buffer.length === 0) return;
 
       if (bufferScript === 'cjk') {
-        items.push(...this.itemizeCJKText(buffer, measureText, measureTextWidths, context, bufferStart, getCjkGlueParams()));
+        items.push(
+          ...this.itemizeCJKText(
+            buffer,
+            measureText,
+            measureTextWidths,
+            context,
+            bufferStart,
+            getCjkGlueParams()
+          )
+        );
       } else {
-        items.push(...this.itemizeWordBased(buffer, bufferStart, measureText, hyphenate, language, availablePatterns, lefthyphenmin, righthyphenmin, context, lineWidth));
+        items.push(
+          ...this.itemizeWordBased(
+            buffer,
+            bufferStart,
+            measureText,
+            hyphenate,
+            language,
+            availablePatterns,
+            lefthyphenmin,
+            righthyphenmin,
+            context,
+            lineWidth
+          )
+        );
       }
 
       buffer = '';
@@ -613,98 +646,77 @@ export class LineBreak {
             segmentIndex += 1;
           } else if (segment.includes('\u00AD')) {
             const parts = segment.split('\u00AD');
-              let runningIndex = 0;
+            let runningIndex = 0;
             for (let k = 0; k < parts.length; k++) {
               const partText = parts[k];
-                if (partText.length > 0) {
-                  items.push({
-                    type: ItemType.BOX,
-                    width: measureText(partText),
-                    text: partText,
-                    originIndex: segmentIndex + runningIndex
-                  } as Box);
-                  runningIndex += partText.length;
-                }
-              if (k < parts.length - 1) {
-                  items.push({
-                    type: ItemType.DISCRETIONARY,
-                    width: 0,
-                    preBreak: '-',
-                    postBreak: '',
-                    noBreak: '',
-                    preBreakWidth: measureText('-'),
-                    penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
-                    flagged: true,
-                    text: '',
-                    originIndex: segmentIndex + runningIndex
-                  } as Discretionary);
-                  runningIndex += 1;
-                }
-              }
-          } else if (hyphenate && segment.length >= lefthyphenmin + righthyphenmin && /^\p{L}+$/u.test(segment)) {
-            const hyphenPoints = this.findHyphenationPoints(segment, language, availablePatterns, lefthyphenmin, righthyphenmin);
-
-              if (hyphenPoints.length > 0) {
-                let lastPoint = 0;
-                for (const point of hyphenPoints) {
-                  const part = segment.substring(lastPoint, point);
-                  items.push({
-                    type: ItemType.BOX,
-                    width: measureText(part),
-                    text: part,
-                    originIndex: segmentIndex + lastPoint
-                  } as Box);
-                  items.push({
-                    type: ItemType.DISCRETIONARY,
-                    width: 0,
-                    preBreak: '-',
-                    postBreak: '',
-                    noBreak: '',
-                    preBreakWidth: measureText('-'),
-                    penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
-                    flagged: true,
-                    text: '',
-                    originIndex: segmentIndex + point
-                  } as Discretionary);
-                  lastPoint = point;
-                }
+              if (partText.length > 0) {
                 items.push({
                   type: ItemType.BOX,
-                width: measureText(segment.substring(lastPoint)),
-                text: segment.substring(lastPoint),
+                  width: measureText(partText),
+                  text: partText,
+                  originIndex: segmentIndex + runningIndex
+                } as Box);
+                runningIndex += partText.length;
+              }
+              if (k < parts.length - 1) {
+                items.push({
+                  type: ItemType.DISCRETIONARY,
+                  width: 0,
+                  preBreak: '-',
+                  postBreak: '',
+                  noBreak: '',
+                  preBreakWidth: measureText('-'),
+                  penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
+                  flagged: true,
+                  text: '',
+                  originIndex: segmentIndex + runningIndex
+                } as Discretionary);
+                runningIndex += 1;
+              }
+            }
+          } else if (
+            hyphenate &&
+            segment.length >= lefthyphenmin + righthyphenmin &&
+            /^\p{L}+$/u.test(segment)
+          ) {
+            const hyphenPoints = this.findHyphenationPoints(
+              segment,
+              language,
+              availablePatterns,
+              lefthyphenmin,
+              righthyphenmin
+            );
+
+            if (hyphenPoints.length > 0) {
+              let lastPoint = 0;
+              for (const point of hyphenPoints) {
+                const part = segment.substring(lastPoint, point);
+                items.push({
+                  type: ItemType.BOX,
+                  width: measureText(part),
+                  text: part,
                   originIndex: segmentIndex + lastPoint
                 } as Box);
-              } else {
-                const wordWidth = measureText(segment);
-                if (lineWidth && wordWidth > lineWidth) {
-                  // Word longer than line width - break into characters
-                  const chars = Array.from(segment);
-                  for (let i = 0; i < chars.length; i++) {
-                    items.push({
-                      type: ItemType.BOX,
-                      width: measureText(chars[i]),
-                      text: chars[i],
-                      originIndex: segmentIndex + i
-                    } as Box);
-                    
-                    if (i < chars.length - 1) {
-                      items.push({
-                        type: ItemType.PENALTY,
-                        width: 0,
-                        penalty: 5000,
-                        originIndex: segmentIndex + i + 1
-                      } as Penalty);
-                    }
-                  }
-                } else {
-                  items.push({
-                    type: ItemType.BOX,
-                    width: wordWidth,
-                    text: segment,
-                    originIndex: segmentIndex
-                  } as Box);
-                }
+                items.push({
+                  type: ItemType.DISCRETIONARY,
+                  width: 0,
+                  preBreak: '-',
+                  postBreak: '',
+                  noBreak: '',
+                  preBreakWidth: measureText('-'),
+                  penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
+                  flagged: true,
+                  text: '',
+                  originIndex: segmentIndex + point
+                } as Discretionary);
+                lastPoint = point;
               }
+              items.push({
+                type: ItemType.BOX,
+                width: measureText(segment.substring(lastPoint)),
+                text: segment.substring(lastPoint),
+                originIndex: segmentIndex + lastPoint
+              } as Box);
             } else {
               const wordWidth = measureText(segment);
               if (lineWidth && wordWidth > lineWidth) {
@@ -717,7 +729,7 @@ export class LineBreak {
                     text: chars[i],
                     originIndex: segmentIndex + i
                   } as Box);
-                  
+
                   if (i < chars.length - 1) {
                     items.push({
                       type: ItemType.PENALTY,
@@ -736,7 +748,38 @@ export class LineBreak {
                 } as Box);
               }
             }
-            segmentIndex += segment.length;
+          } else {
+            const wordWidth = measureText(segment);
+            if (lineWidth && wordWidth > lineWidth) {
+              // Word longer than line width - break into characters
+              const chars = Array.from(segment);
+              for (let i = 0; i < chars.length; i++) {
+                items.push({
+                  type: ItemType.BOX,
+                  width: measureText(chars[i]),
+                  text: chars[i],
+                  originIndex: segmentIndex + i
+                } as Box);
+
+                if (i < chars.length - 1) {
+                  items.push({
+                    type: ItemType.PENALTY,
+                    width: 0,
+                    penalty: 5000,
+                    originIndex: segmentIndex + i + 1
+                  } as Penalty);
+                }
+              }
+            } else {
+              items.push({
+                type: ItemType.BOX,
+                width: wordWidth,
+                text: segment,
+                originIndex: segmentIndex
+              } as Box);
+            }
+          }
+          segmentIndex += segment.length;
         }
         currentIndex += token.length;
       }
@@ -774,9 +817,12 @@ export class LineBreak {
 
       // Check if this is a legal breakpoint
       const isBreakpoint =
-        (item.type === ItemType.PENALTY && (item as Penalty).penalty < INFINITY_PENALTY) ||
-        (item.type === ItemType.DISCRETIONARY) ||
-        (item.type === ItemType.GLUE && i > 0 && items[i - 1].type === ItemType.BOX);
+        (item.type === ItemType.PENALTY &&
+          (item as Penalty).penalty < INFINITY_PENALTY) ||
+        item.type === ItemType.DISCRETIONARY ||
+        (item.type === ItemType.GLUE &&
+          i > 0 &&
+          items[i - 1].type === ItemType.BOX);
 
       if (!isBreakpoint) continue;
 
@@ -824,7 +870,8 @@ export class LineBreak {
 
         if (shortfall > 0) {
           const effectiveStretch = lineStretch + emergencyStretch;
-          ratio = effectiveStretch > 0 ? shortfall / effectiveStretch : Infinity;
+          ratio =
+            effectiveStretch > 0 ? shortfall / effectiveStretch : Infinity;
         } else if (shortfall < 0) {
           ratio = lineShrink > 0 ? shortfall / lineShrink : -Infinity;
         } else {
@@ -832,7 +879,10 @@ export class LineBreak {
         }
 
         // Calculate badness
-        const bad = this.badness(shortfall, shortfall > 0 ? lineStretch + emergencyStretch : lineShrink);
+        const bad = this.badness(
+          shortfall,
+          shortfall > 0 ? lineStretch + emergencyStretch : lineShrink
+        );
 
         // Check feasibility - THIS IS THE KEY FIX: compare bad vs threshold, not ratio
         if (ratio < -1) {
@@ -1000,7 +1050,10 @@ export class LineBreak {
     }
 
     let useHyphenation = hyphenate;
-    if (useHyphenation && (!hyphenationPatterns || !hyphenationPatterns[language])) {
+    if (
+      useHyphenation &&
+      (!hyphenationPatterns || !hyphenationPatterns[language])
+    ) {
       logger.warn(`Hyphenation patterns for ${language} not available`);
       useHyphenation = false;
     }
@@ -1025,7 +1078,8 @@ export class LineBreak {
     if (!width || width === Infinity) {
       const measuredWidth = measureText(text);
       perfLogger.end('LineBreak.breakText');
-      return [{
+      return [
+        {
           text,
           originalStart: 0,
           originalEnd: text.length - 1,
@@ -1033,16 +1087,39 @@ export class LineBreak {
           isLastLine: true,
           naturalWidth: measuredWidth,
           endedWithHyphen: false
-      }];
+        }
+      ];
     }
 
     // First pass: without hyphenation
-    let items = this.itemizeText(text, measureText, measureTextWidths, false, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context, width);
+    let items = this.itemizeText(
+      text,
+      measureText,
+      measureTextWidths,
+      false,
+      language,
+      hyphenationPatterns,
+      lefthyphenmin,
+      righthyphenmin,
+      context,
+      width
+    );
     let best = this.lineBreak(items, width, pretolerance, 0, context);
 
     // Second pass: with hyphenation
     if (!best && useHyphenation) {
-      items = this.itemizeText(text, measureText, measureTextWidths, true, language, hyphenationPatterns, lefthyphenmin, righthyphenmin, context, width);
+      items = this.itemizeText(
+        text,
+        measureText,
+        measureTextWidths,
+        true,
+        language,
+        hyphenationPatterns,
+        lefthyphenmin,
+        righthyphenmin,
+        context,
+        width
+      );
       best = this.lineBreak(items, width, tolerance, 0, context);
     }
 
@@ -1050,9 +1127,10 @@ export class LineBreak {
     if (!best) {
       const MAX_EMERGENCY_ITERATIONS = 5;
       for (let i = 0; i < MAX_EMERGENCY_ITERATIONS && !best; i++) {
-        const currentStretch = initialEmergencyStretch + i * width * EMERGENCY_STRETCH_INCREMENT;
+        const currentStretch =
+          initialEmergencyStretch + i * width * EMERGENCY_STRETCH_INCREMENT;
         best = this.lineBreak(items, width, tolerance, currentStretch, context);
-        
+
         // Fourth pass: high threshold with current stretch
         if (!best) {
           best = this.lineBreak(items, width, INF_BAD, currentStretch, context);
@@ -1069,20 +1147,30 @@ export class LineBreak {
       }
 
       perfLogger.end('LineBreak.breakText');
-      return this.postLineBreak(text, items, breakpoints, width, align, direction, context);
+      return this.postLineBreak(
+        text,
+        items,
+        breakpoints,
+        width,
+        align,
+        direction,
+        context
+      );
     }
 
     perfLogger.end('LineBreak.breakText');
-    return [{
-      text,
-      originalStart: 0,
-      originalEnd: text.length - 1,
-      xOffset: 0,
-      adjustmentRatio: 0,
-      isLastLine: true,
-      naturalWidth: measureText(text),
-      endedWithHyphen: false
-    }];
+    return [
+      {
+        text,
+        originalStart: 0,
+        originalEnd: text.length - 1,
+        xOffset: 0,
+        adjustmentRatio: 0,
+        isLastLine: true,
+        naturalWidth: measureText(text),
+        endedWithHyphen: false
+      }
+    ];
   }
 
   // TeX: post_line_break (tex.web lines 17260-17448)
@@ -1097,12 +1185,14 @@ export class LineBreak {
     context?: LineBreakContext
   ): LineInfo[] {
     if (breakpoints.length === 0) {
-      return [{
+      return [
+        {
           text,
           originalStart: 0,
           originalEnd: text.length - 1,
           xOffset: 0
-      }];
+        }
+      ];
     }
 
     const lines: LineInfo[] = [];
@@ -1110,8 +1200,11 @@ export class LineBreak {
 
     for (let i = 0; i < breakpoints.length; i++) {
       const breakpoint = breakpoints[i];
-      const willHaveFinalLine = breakpoints[breakpoints.length - 1] + 1 < items.length - 1;
-      const isLastLine = willHaveFinalLine ? false : i === breakpoints.length - 1;
+      const willHaveFinalLine =
+        breakpoints[breakpoints.length - 1] + 1 < items.length - 1;
+      const isLastLine = willHaveFinalLine
+        ? false
+        : i === breakpoints.length - 1;
 
       const lineTextParts: string[] = [];
       let originalStart = -1;
@@ -1123,13 +1216,17 @@ export class LineBreak {
       for (let j = lineStart; j < breakpoint; j++) {
         const item = items[j];
 
-        if ((item.type === ItemType.PENALTY && !item.text) ||
-            (item.type === ItemType.DISCRETIONARY && !(item as Discretionary).noBreak)) {
+        if (
+          (item.type === ItemType.PENALTY && !item.text) ||
+          (item.type === ItemType.DISCRETIONARY &&
+            !(item as Discretionary).noBreak)
+        ) {
           continue;
         }
 
         if (item.originIndex !== undefined) {
-          if (originalStart === -1 || item.originIndex < originalStart) originalStart = item.originIndex;
+          if (originalStart === -1 || item.originIndex < originalStart)
+            originalStart = item.originIndex;
           const textLength = item.text ? item.text.length : 0;
           const itemEnd = item.originIndex + textLength - 1;
           if (itemEnd > originalEnd) originalEnd = itemEnd;
@@ -1154,18 +1251,23 @@ export class LineBreak {
       let endedWithHyphen = false;
 
       if (breakpoint < items.length) {
-        if (breakItem.type === ItemType.PENALTY && (breakItem as Penalty).flagged) {
+        if (
+          breakItem.type === ItemType.PENALTY &&
+          (breakItem as Penalty).flagged
+        ) {
           lineTextParts.push('-');
           naturalWidth += breakItem.width;
           endedWithHyphen = true;
-          if (breakItem.originIndex !== undefined) originalEnd = breakItem.originIndex - 1;
+          if (breakItem.originIndex !== undefined)
+            originalEnd = breakItem.originIndex - 1;
         } else if (breakItem.type === ItemType.DISCRETIONARY) {
           const disc = breakItem as Discretionary;
           if (disc.preBreak) {
             lineTextParts.push(disc.preBreak);
             naturalWidth += disc.preBreakWidth;
             endedWithHyphen = disc.flagged || false;
-            if (breakItem.originIndex !== undefined) originalEnd = breakItem.originIndex - 1;
+            if (breakItem.originIndex !== undefined)
+              originalEnd = breakItem.originIndex - 1;
           }
         }
       }
@@ -1224,7 +1326,10 @@ export class LineBreak {
         if (item.type === ItemType.PENALTY) continue;
 
         if (item.originIndex !== undefined) {
-          if (finalOriginalStart === -1 || item.originIndex < finalOriginalStart) {
+          if (
+            finalOriginalStart === -1 ||
+            item.originIndex < finalOriginalStart
+          ) {
             finalOriginalStart = item.originIndex;
           }
           if (item.originIndex > finalOriginalEnd) {

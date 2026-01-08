@@ -99,13 +99,7 @@ beforeAll(async () => {
 
 describe('TextShaper.shapeLines performance', () => {
   bench('Latin text (4 lines, ~160 chars)', () => {
-    shaper.shapeLines(
-      latinLines,
-      1.2 * loadedFont.upem,
-      0,
-      'left',
-      'ltr'
-    );
+    shaper.shapeLines(latinLines, 1.2 * loadedFont.upem, 0, 'left', 'ltr');
   });
 
   bench('Latin text justified (4 lines)', () => {
@@ -113,32 +107,14 @@ describe('TextShaper.shapeLines performance', () => {
       ...l,
       adjustmentRatio: i < 3 ? 0.15 : 0
     }));
-    shaper.shapeLines(
-      justifyLines,
-      1.2 * loadedFont.upem,
-      0,
-      'justify',
-      'ltr'
-    );
+    shaper.shapeLines(justifyLines, 1.2 * loadedFont.upem, 0, 'justify', 'ltr');
   });
 
   bench('Latin text with letter spacing (4 lines)', () => {
-    shaper.shapeLines(
-      latinLines,
-      1.2 * loadedFont.upem,
-      0.05,
-      'left',
-      'ltr'
-    );
+    shaper.shapeLines(latinLines, 1.2 * loadedFont.upem, 0.05, 'left', 'ltr');
   });
 
   bench('CJK text justified (3 lines, ~50 chars)', () => {
-    shaper.shapeLines(
-      cjkLines,
-      1.2 * loadedFont.upem,
-      0,
-      'justify',
-      'ltr'
-    );
+    shaper.shapeLines(cjkLines, 1.2 * loadedFont.upem, 0, 'justify', 'ltr');
   });
 });

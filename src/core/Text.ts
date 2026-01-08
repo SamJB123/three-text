@@ -394,7 +394,9 @@ export class Text {
       // to selectively use glyph-level caching (separate vertices) only for clusters containing
       // colored text, while non-colored clusters can still use fast cluster-level merging
       let coloredTextIndices: Set<number> | undefined;
-      let byTextMatches: { pattern: string; start: number; end: number }[] | undefined;
+      let byTextMatches:
+        | { pattern: string; start: number; end: number }[]
+        | undefined;
       if (
         options.color &&
         typeof options.color === 'object' &&
@@ -408,7 +410,11 @@ export class Text {
             for (const pattern of Object.keys(options.color.byText)) {
               let index = 0;
               while ((index = options.text.indexOf(pattern, index)) !== -1) {
-                byTextMatches.push({ pattern, start: index, end: index + pattern.length });
+                byTextMatches.push({
+                  pattern,
+                  start: index,
+                  end: index + pattern.length
+                });
                 for (let i = index; i < index + pattern.length; i++) {
                   coloredTextIndices.add(i);
                 }

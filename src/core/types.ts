@@ -299,11 +299,11 @@ export interface HyphenationPatternsMap {
 
 export interface CurveFidelityConfig {
   distanceTolerance?: number; // max deviation from true curve, in font units (default: 0.5)
-  angleTolerance?: number;    // max angle between segments in radians (default: 0.2)
+  angleTolerance?: number; // max angle between segments in radians (default: 0.2)
 }
 
 export interface GeometryOptimizationOptions {
-  enabled?: boolean;      // Enable Visvalingam-Whyatt simplification (default: true)
+  enabled?: boolean; // Enable Visvalingam-Whyatt simplification (default: true)
   areaThreshold?: number; // Min triangle area for Visvalingam-Whyatt (default: 1.0)
 }
 

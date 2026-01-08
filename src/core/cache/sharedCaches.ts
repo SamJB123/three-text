@@ -23,5 +23,9 @@ export const globalWordCache = new Cache<string, GlyphData>();
 
 export const globalClusteringCache = new Cache<
   string,
-  { glyphIds: number[]; positions: { x: number; y: number }[]; groups: number[][] }
+  {
+    glyphIds: number[];
+    positions: { x: number; y: number }[];
+    groups: number[][];
+  }
 >();

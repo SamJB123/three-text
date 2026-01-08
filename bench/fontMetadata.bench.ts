@@ -43,4 +43,3 @@ describe('FontMetadata extraction', () => {
     FontMetadataExtractor.extractAll(decompressedBuffer);
   });
 });
-

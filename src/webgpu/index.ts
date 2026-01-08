@@ -143,12 +143,16 @@ export function createWebGPUBuffers(
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true
     });
-    new Float32Array(glyphCenterBuffer.getMappedRange()).set(glyphAttributes.glyphCenter);
+    new Float32Array(glyphCenterBuffer.getMappedRange()).set(
+      glyphAttributes.glyphCenter
+    );
     glyphCenterBuffer.unmap();
     buffers.glyphCenter = glyphCenterBuffer;
     layout.glyphCenter = {
       arrayStride: 12,
-      attributes: [{ shaderLocation: nextShaderLocation++, offset: 0, format: 'float32x3' }]
+      attributes: [
+        { shaderLocation: nextShaderLocation++, offset: 0, format: 'float32x3' }
+      ]
     };
 
     glyphIndexBuffer = device.createBuffer({
@@ -156,12 +160,16 @@ export function createWebGPUBuffers(
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true
     });
-    new Float32Array(glyphIndexBuffer.getMappedRange()).set(glyphAttributes.glyphIndex);
+    new Float32Array(glyphIndexBuffer.getMappedRange()).set(
+      glyphAttributes.glyphIndex
+    );
     glyphIndexBuffer.unmap();
     buffers.glyphIndex = glyphIndexBuffer;
     layout.glyphIndex = {
       arrayStride: 4,
-      attributes: [{ shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }]
+      attributes: [
+        { shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }
+      ]
     };
 
     glyphLineIndexBuffer = device.createBuffer({
@@ -169,12 +177,16 @@ export function createWebGPUBuffers(
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true
     });
-    new Float32Array(glyphLineIndexBuffer.getMappedRange()).set(glyphAttributes.glyphLineIndex);
+    new Float32Array(glyphLineIndexBuffer.getMappedRange()).set(
+      glyphAttributes.glyphLineIndex
+    );
     glyphLineIndexBuffer.unmap();
     buffers.glyphLineIndex = glyphLineIndexBuffer;
     layout.glyphLineIndex = {
       arrayStride: 4,
-      attributes: [{ shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }]
+      attributes: [
+        { shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }
+      ]
     };
 
     glyphProgressBuffer = device.createBuffer({
@@ -182,12 +194,16 @@ export function createWebGPUBuffers(
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true
     });
-    new Float32Array(glyphProgressBuffer.getMappedRange()).set(glyphAttributes.glyphProgress);
+    new Float32Array(glyphProgressBuffer.getMappedRange()).set(
+      glyphAttributes.glyphProgress
+    );
     glyphProgressBuffer.unmap();
     buffers.glyphProgress = glyphProgressBuffer;
     layout.glyphProgress = {
       arrayStride: 4,
-      attributes: [{ shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }]
+      attributes: [
+        { shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }
+      ]
     };
 
     glyphBaselineYBuffer = device.createBuffer({
@@ -195,12 +211,16 @@ export function createWebGPUBuffers(
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true
     });
-    new Float32Array(glyphBaselineYBuffer.getMappedRange()).set(glyphAttributes.glyphBaselineY);
+    new Float32Array(glyphBaselineYBuffer.getMappedRange()).set(
+      glyphAttributes.glyphBaselineY
+    );
     glyphBaselineYBuffer.unmap();
     buffers.glyphBaselineY = glyphBaselineYBuffer;
     layout.glyphBaselineY = {
       arrayStride: 4,
-      attributes: [{ shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }]
+      attributes: [
+        { shaderLocation: nextShaderLocation++, offset: 0, format: 'float32' }
+      ]
     };
   }
 

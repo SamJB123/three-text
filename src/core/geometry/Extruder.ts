@@ -162,7 +162,7 @@ export class Extruder {
     let nextVertex = numPoints * 2;
     let idxPos = triLen * 2;
     const numEdges = boundaryEdges.length;
-    
+
     for (let e = 0; e < numEdges; e++) {
       const edge = boundaryEdges[e];
       const u = edge[0];

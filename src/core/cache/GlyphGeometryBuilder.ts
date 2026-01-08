@@ -57,7 +57,11 @@ export class GlyphGeometryBuilder {
   private contourCache: Cache<string, GlyphContours>;
   private clusteringCache: Cache<
     string,
-    { glyphIds: number[]; positions: { x: number; y: number }[]; groups: number[][] }
+    {
+      glyphIds: number[];
+      positions: { x: number; y: number }[];
+      groups: number[][];
+    }
   >;
   private emptyGlyphs: Set<number> = new Set();
 

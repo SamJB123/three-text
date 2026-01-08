@@ -177,44 +177,50 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
         pointsRemovedByVisvalingam: 5,
         originalPointCount: 100
       }),
-      buildInstancedGeometry: vi.fn((clustersByLine, depth, removeOverlaps, isCFF, scale) => {
-        // Generate mock glyph infos from clusters
-        const glyphInfos: any[] = [];
-        let vertexOffset = 0;
+      buildInstancedGeometry: vi.fn(
+        (clustersByLine, depth, removeOverlaps, isCFF, scale) => {
+          // Generate mock glyph infos from clusters
+          const glyphInfos: any[] = [];
+          let vertexOffset = 0;
 
-        if (clustersByLine && clustersByLine.length > 0) {
-          clustersByLine.forEach((line: any[]) => {
-            line.forEach((cluster: any) => {
-              if (cluster.glyphs) {
-                cluster.glyphs.forEach((glyph: any) => {
-                  glyphInfos.push({
-                    textIndex: glyph.absoluteTextIndex ?? 0,
-                    lineIndex: glyph.lineIndex ?? 0,
-                    vertexStart: vertexOffset,
-                    vertexCount: 20,
-                    bounds: {
-                      min: { x: vertexOffset * scale, y: 0, z: 0 },
-                      max: { x: (vertexOffset + 10) * scale, y: 10 * scale, z: 0 }
-                    }
+          if (clustersByLine && clustersByLine.length > 0) {
+            clustersByLine.forEach((line: any[]) => {
+              line.forEach((cluster: any) => {
+                if (cluster.glyphs) {
+                  cluster.glyphs.forEach((glyph: any) => {
+                    glyphInfos.push({
+                      textIndex: glyph.absoluteTextIndex ?? 0,
+                      lineIndex: glyph.lineIndex ?? 0,
+                      vertexStart: vertexOffset,
+                      vertexCount: 20,
+                      bounds: {
+                        min: { x: vertexOffset * scale, y: 0, z: 0 },
+                        max: {
+                          x: (vertexOffset + 10) * scale,
+                          y: 10 * scale,
+                          z: 0
+                        }
+                      }
+                    });
+                    vertexOffset += 20;
                   });
-                  vertexOffset += 20;
-                });
-              }
+                }
+              });
             });
-          });
-        }
-
-        return {
-          vertices: mockVertices,
-          normals: mockNormals,
-          indices: mockIndices,
-          glyphInfos,
-          planeBounds: {
-            min: { x: 0, y: 0, z: 0 },
-            max: { x: 1280 * scale, y: 800 * scale, z: 0 }
           }
-        };
-      }),
+
+          return {
+            vertices: mockVertices,
+            normals: mockNormals,
+            indices: mockIndices,
+            glyphInfos,
+            planeBounds: {
+              min: { x: 0, y: 0, z: 0 },
+              max: { x: 1280 * scale, y: 800 * scale, z: 0 }
+            }
+          };
+        }
+      ),
       getCacheStats: vi.fn().mockReturnValue({
         hits: 10,
         misses: 5,

@@ -436,7 +436,11 @@ export class FontMetadataExtractor {
 
     let axisNames: { [tag: string]: string } | null = null;
     if (fvarTableOffset && statTableOffset && nameIndex) {
-      axisNames = this.extractAxisNamesWithIndex(view, statTableOffset, nameIndex);
+      axisNames = this.extractAxisNamesWithIndex(
+        view,
+        statTableOffset,
+        nameIndex
+      );
     }
 
     return {

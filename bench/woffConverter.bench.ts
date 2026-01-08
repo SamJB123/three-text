@@ -17,10 +17,7 @@ beforeAll(async () => {
     merriweatherFile.byteOffset + merriweatherFile.byteLength
   );
 
-  const nimbusPath = join(
-    __dirname,
-    '../examples/fonts/NimbusSanL-Reg.woff'
-  );
+  const nimbusPath = join(__dirname, '../examples/fonts/NimbusSanL-Reg.woff');
   const nimbusFile = readFileSync(nimbusPath);
   nimbusBuffer = nimbusFile.buffer.slice(
     nimbusFile.byteOffset,
@@ -41,4 +38,3 @@ describe('WoffConverter decompression', () => {
     await WoffConverter.decompressWoff(nimbusBuffer);
   });
 });
-
