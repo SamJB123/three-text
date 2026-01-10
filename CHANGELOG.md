@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1] - 2026-01-10
+
+### Fixed
+
+- HarfBuzz init: fixed `ReferenceError: __dirname is not defined` in hybrid runtimes like NW.js when evaluating the ESM build
+
 ## [0.4.0] - 2026-01-03
 
 ### Breaking changes

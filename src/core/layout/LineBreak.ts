@@ -1,5 +1,5 @@
-// Knuth-Plass line breaking algorithm with Liang hyphenation
-// References: tex.web (TeX), linebreak.c (LuaTeX), break.lua (SILE)
+// Knuth-Plass line breaking with Liang hyphenation
+// References: break.lua (SILE), tex.web (TeX), linebreak.c (LuaTeX), pTeX, xeCJK
 
 import { perfLogger } from '../../utils/PerformanceLogger';
 import { logger } from '../../utils/Logger';
@@ -77,7 +77,7 @@ interface BreakNode {
   activeIndex: number; // index in activeList for O(1) removal
 }
 
-// Active node management with Map for O(1) lookup by (position, fitness)
+// Active node management with Map for lookup by (position, fitness)
 class ActiveNodeList {
   private nodesByKey: Map<number, BreakNode> = new Map();
   private activeList: BreakNode[] = [];
@@ -195,7 +195,7 @@ const EMERGENCY_STRETCH_INCREMENT = 0.1;
 
 // Cumulative sums of width/stretch/shrink up to each item index.
 // To get the total width between items[a] and items[b], compute:
-//   cumulative.width[b] - cumulative.width[a]
+//  cumulative.width[b] - cumulative.width[a]
 // This avoids re-summing items every time we evaluate a potential line break
 interface CumulativeWidths {
   width: Float64Array;
@@ -206,15 +206,22 @@ interface CumulativeWidths {
 export class LineBreak {
   // TeX: badness function (tex.web lines 2337-2348)
   // Computes badness = 100 * (t/s)³ where t=adjustment, s=stretchability
+  // Simplified from TeX's fixed-point integer arithmetic to floating-point
+  //
+  // Returns INF_BAD+1 for overfull boxes so they're rejected even when
+  // threshold=INF_BAD in emergency pass
   private static badness(t: number, s: number): number {
     if (t === 0) return 0;
     if (s <= 0) return INF_BAD + 1;
-    const r = Math.abs(t) / s;
+    const r = Math.abs(t / s);
     if (r > 10) return INF_BAD + 1;
-    return Math.min(Math.round(100 * r * r * r), INF_BAD);
+    return Math.min(Math.round(100 * r ** 3), INF_BAD);
   }
 
-  // TeX fitness classification (tex.web lines 16796-16812)
+  // TeX fitness classification (tex.web lines 16099-16105, 16799-16812)
+  // TeX uses badness thresholds 12 and 99, which correspond to ratios ~0.5 and ~1.0
+  // We use ratio directly since we compute it anyway. Well, and because SILE does
+  // it this way. Thanks Simon :)
   private static fitnessClass(ratio: number): FitnessClass {
     if (ratio < -0.5) return FitnessClass.TIGHT; // shrinking significantly
     if (ratio < 0.5) return FitnessClass.DECENT; // normal
@@ -515,6 +522,8 @@ export class LineBreak {
     const items: Item[] = [];
     const chars = Array.from(text);
 
+    // Inter-character glue for CJK justification
+    // Matches pTeX's default \kanjiskip behavior
     let cjkGlueParams:
       | { width: number; stretch: number; shrink: number }
       | undefined;
@@ -884,7 +893,7 @@ export class LineBreak {
           shortfall > 0 ? lineStretch + emergencyStretch : lineShrink
         );
 
-        // Check feasibility - THIS IS THE KEY FIX: compare bad vs threshold, not ratio
+        // Check feasibility
         if (ratio < -1) {
           toDeactivate.push(a);
           continue;

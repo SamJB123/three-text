@@ -205,10 +205,30 @@ const harfbuzzPlugin = () => ({
   load(id) {
     // Provide browser-compatible stubs for Node.js modules
     if (id === 'fs') {
-      return `export default {}; export const readFileSync = () => { throw new Error('fs not available in browser'); };`;
+      // Delegate to real Node fs when available (NW.js), otherwise throw
+      return `
+export default {};
+export const readFileSync = (...args) => {
+  const req = typeof globalThis !== 'undefined' ? globalThis.require : undefined;
+  if (typeof req === 'function') {
+    return req('fs').readFileSync(...args);
+  }
+  throw new Error('fs not available in this environment');
+};
+`;
     }
     if (id === 'path') {
       return `export default {}; export const join = (...args) => args.join('/');`;
+    }
+    return null;
+  },
+  transform(code, id) {
+    // Fix __dirname crash in ESM environments (NW.js, Electron, etc.)
+    if (id.includes('harfbuzzjs') && id.endsWith('hb.js')) {
+      return code.replace(
+        /scriptDirectory=__dirname\+"\/"/, 
+        'scriptDirectory=(typeof __dirname!=="undefined"?__dirname+"/":"")'
+      );
     }
     return null;
   }
