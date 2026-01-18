@@ -52,6 +52,20 @@ describe.runIf(process.env.THREE_TEXT_LOG === 'true')(
           language: 'en-us'
         }
       };
+      const overlapWord = 'W'.repeat(60);
+      const overlapText = Array.from({ length: 20 }, () => overlapWord).join(' ');
+      const overlapConfig = {
+        ...config,
+        text: overlapText,
+        letterSpacing: -0.15,
+        removeOverlaps: true,
+        layout: {
+          ...config.layout,
+          width: 20000,
+          align: 'left',
+          hyphenate: false
+        }
+      };
 
       // Cold runs – first few passes through the pipeline in this process
       perfLogger.clear();
@@ -72,6 +86,15 @@ describe.runIf(process.env.THREE_TEXT_LOG === 'true')(
       }
 
       console.log('\n=== WARM (after V8 optimization and caching) ===');
+      perfLogger.printSummary();
+
+      perfLogger.clear();
+      for (let i = 0; i < warmIterations; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await Text.create(overlapConfig);
+      }
+
+      console.log('\n=== OVERLAP WARM ===');
       perfLogger.printSummary();
     }, 30000);
   }
