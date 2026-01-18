@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.3] - 2026-01-18
+
+### Performance
+
+- `GlyphGeometryBuilder`
+  - Faster instanced buffer packing
+  - Reuse task and overlap buffers to reduce allocations
+  - Tessellate overlap clusters from contours to avoid `Vec2` copies
+- `BoundaryClusterer`: Reuse position vectors during clustering
+
+### Added
+
+- Overlap stress benchmark for `Text.create`
+
 ## [0.4.2] - 2026-01-17
 
 ### Performance
