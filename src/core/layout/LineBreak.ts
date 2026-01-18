@@ -75,6 +75,10 @@ interface BreakNode {
   hyphenated: boolean; // whether this line ends with hyphen
   active: boolean; // whether node is still viable
   activeIndex: number; // index in activeList for O(1) removal
+  // Cumulative width/stretch/shrink up to this node's position
+  cumWidth: number;
+  cumStretch: number;
+  cumShrink: number;
 }
 
 // Active node management with Map for lookup by (position, fitness)
@@ -98,6 +102,9 @@ class ActiveNodeList {
         existing.previous = node.previous;
         existing.hyphenated = node.hyphenated;
         existing.line = node.line;
+        existing.cumWidth = node.cumWidth;
+        existing.cumStretch = node.cumStretch;
+        existing.cumShrink = node.cumShrink;
         return true;
       }
       return false;
@@ -193,16 +200,6 @@ const EJECT_PENALTY = -10000; // eject_penalty - force break here
 // Retry increment when no breakpoints found
 const EMERGENCY_STRETCH_INCREMENT = 0.1;
 
-// Cumulative sums of width/stretch/shrink up to each item index.
-// To get the total width between items[a] and items[b], compute:
-//  cumulative.width[b] - cumulative.width[a]
-// This avoids re-summing items every time we evaluate a potential line break
-interface CumulativeWidths {
-  width: Float64Array;
-  stretch: Float64Array;
-  shrink: Float64Array;
-}
-
 export class LineBreak {
   // TeX: badness function (tex.web lines 2337-2348)
   // Computes badness = 100 * (t/s)³ where t=adjustment, s=stretchability
@@ -227,30 +224,6 @@ export class LineBreak {
     if (ratio < 0.5) return FitnessClass.DECENT; // normal
     if (ratio < 1) return FitnessClass.LOOSE; // stretching 0.5-1.0
     return FitnessClass.VERY_LOOSE; // stretching > 1.0
-  }
-
-  // Build prefix sums so we can quickly compute the width/stretch/shrink
-  // of any range [a, b] as cumulative[b] - cumulative[a]
-  private static computeCumulativeWidths(items: Item[]): CumulativeWidths {
-    const n = items.length + 1;
-    const width = new Float64Array(n);
-    const stretch = new Float64Array(n);
-    const shrink = new Float64Array(n);
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      width[i + 1] = width[i] + item.width;
-
-      if (item.type === ItemType.GLUE) {
-        stretch[i + 1] = stretch[i] + (item as Glue).stretch;
-        shrink[i + 1] = shrink[i] + (item as Glue).shrink;
-      } else {
-        stretch[i + 1] = stretch[i];
-        shrink[i + 1] = shrink[i];
-      }
-    }
-
-    return { width, stretch, shrink };
   }
 
   public static findHyphenationPoints(
@@ -805,10 +778,9 @@ export class LineBreak {
     emergencyStretch: number,
     context: LineBreakContext
   ): BreakNode | null {
-    const cumulative = this.computeCumulativeWidths(items);
     const activeNodes = new ActiveNodeList();
 
-    // Start node
+    // Start node with zero cumulative width
     activeNodes.insert({
       position: 0,
       line: 0,
@@ -817,8 +789,16 @@ export class LineBreak {
       previous: null,
       hyphenated: false,
       active: true,
-      activeIndex: 0
+      activeIndex: 0,
+      cumWidth: 0,
+      cumStretch: 0,
+      cumShrink: 0
     });
+
+    // Cumulative width from paragraph start, representing items[0..i-1]
+    let cumWidth = 0;
+    let cumStretch = 0;
+    let cumShrink = 0;
 
     // Process each item
     for (let i = 0; i < items.length; i++) {
@@ -833,7 +813,20 @@ export class LineBreak {
           i > 0 &&
           items[i - 1].type === ItemType.BOX);
 
-      if (!isBreakpoint) continue;
+      if (!isBreakpoint) {
+        // Accumulate width for non-breakpoint items
+        if (item.type === ItemType.BOX) {
+          cumWidth += item.width;
+        } else if (item.type === ItemType.GLUE) {
+          const glue = item as Glue;
+          cumWidth += glue.width;
+          cumStretch += glue.stretch;
+          cumShrink += glue.shrink;
+        } else if (item.type === ItemType.DISCRETIONARY) {
+          cumWidth += item.width;
+        }
+        continue;
+      }
 
       // Get penalty and flagged status
       let pi = 0;
@@ -859,20 +852,15 @@ export class LineBreak {
       // Nodes to deactivate
       const toDeactivate: BreakNode[] = [];
 
-      // Current cumulative values at position i
-      const curWidth = cumulative.width[i];
-      const curStretch = cumulative.stretch[i];
-      const curShrink = cumulative.shrink[i];
-
       // Try each active node as predecessor
       const active = activeNodes.getActive();
       for (let j = 0; j < active.length; j++) {
         const a = active[j];
 
-        // Line width from a to i using cumulative arrays
-        const lineW = curWidth - cumulative.width[a.position] + breakWidth;
-        const lineStretch = curStretch - cumulative.stretch[a.position];
-        const lineShrink = curShrink - cumulative.shrink[a.position];
+        // Line width from a to i
+        const lineW = cumWidth - a.cumWidth + breakWidth;
+        const lineStretch = cumStretch - a.cumStretch;
+        const lineShrink = cumShrink - a.cumShrink;
 
         const shortfall = lineWidth - lineW;
         let ratio: number;
@@ -939,7 +927,10 @@ export class LineBreak {
             previous: a,
             hyphenated: flagged,
             active: true,
-            activeIndex: -1
+            activeIndex: -1,
+            cumWidth: cumWidth,
+            cumStretch: cumStretch,
+            cumShrink: cumShrink
           };
         }
       }
@@ -958,6 +949,18 @@ export class LineBreak {
 
       if (activeNodes.size() === 0 && pi !== EJECT_PENALTY) {
         return null;
+      }
+
+      // Accumulate width after evaluating this breakpoint
+      if (item.type === ItemType.BOX) {
+        cumWidth += item.width;
+      } else if (item.type === ItemType.GLUE) {
+        const glue = item as Glue;
+        cumWidth += glue.width;
+        cumStretch += glue.stretch;
+        cumShrink += glue.shrink;
+      } else if (item.type === ItemType.DISCRETIONARY) {
+        cumWidth += item.width;
       }
     }
 
