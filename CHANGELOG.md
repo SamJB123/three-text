@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.2] - 2026-01-17
+
+### Performance
+
+- `LineBreak`: Store cumulative widths in break nodes instead of prefix sum arrays
+
+### Added
+
+- `LineBreak` tests and benchmarks
+
 ## [0.4.1] - 2026-01-10
 
 ### Fixed
