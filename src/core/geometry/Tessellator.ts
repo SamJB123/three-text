@@ -31,6 +31,24 @@ export class Tessellator {
     );
   }
 
+  public processContours(
+    contours: number[][],
+    removeOverlaps: boolean = true,
+    isCFF: boolean = false,
+    needsExtrusionContours: boolean = true
+  ): ProcessedGeometry {
+    if (contours.length === 0) {
+      return { triangles: { vertices: [], indices: [] }, contours: [] };
+    }
+
+    return this.tessellateContours(
+      contours,
+      removeOverlaps,
+      isCFF,
+      needsExtrusionContours
+    );
+  }
+
   private tessellate(
     paths: Path[],
     removeOverlaps: boolean,
@@ -76,6 +94,85 @@ export class Tessellator {
       }
 
       // Boundary pass normalizes winding (outer CCW, holes CW)
+      tessContours = this.boundaryToContours(boundaryResult);
+      if (needsExtrusionContours) {
+        extrusionContours = tessContours;
+      }
+      logger.log(
+        `Boundary pass created ${tessContours.length} contours. Starting triangulation pass.`
+      );
+    } else {
+      logger.log(`Single-pass triangulation for ${isCFF ? 'CFF' : 'TTF'}`);
+    }
+
+    perfLogger.start('Tessellator.triangulationPass', {
+      contourCount: tessContours.length
+    });
+    const triangleResult = this.performTessellation(tessContours, 'triangles');
+    perfLogger.end('Tessellator.triangulationPass');
+    if (!triangleResult) {
+      const warning = removeOverlaps
+        ? 'libtess returned empty result from triangulation pass'
+        : 'libtess returned empty result from single-pass triangulation';
+      logger.warn(warning);
+      return {
+        triangles: { vertices: [], indices: [] },
+        contours: extrusionContours
+      };
+    }
+
+    return {
+      triangles: {
+        vertices: triangleResult.vertices,
+        indices: triangleResult.indices || []
+      },
+      contours: extrusionContours
+    };
+  }
+
+  private tessellateContours(
+    contours: number[][],
+    removeOverlaps: boolean,
+    isCFF: boolean,
+    needsExtrusionContours: boolean
+  ): ProcessedGeometry {
+    const needsWindingReversal = !isCFF && !removeOverlaps;
+    let originalContours: number[][] | undefined;
+    let tessContours: number[][];
+
+    if (needsWindingReversal) {
+      tessContours = this.reverseContours(contours);
+      if (removeOverlaps || needsExtrusionContours) {
+        originalContours = contours;
+      }
+    } else {
+      originalContours = contours;
+      tessContours = contours;
+    }
+
+    let extrusionContours: number[][] = needsExtrusionContours
+      ? needsWindingReversal
+        ? tessContours
+        : (originalContours ?? contours)
+      : [];
+
+    if (removeOverlaps) {
+      logger.log('Two-pass: boundary extraction then triangulation');
+
+      perfLogger.start('Tessellator.boundaryPass', {
+        contourCount: tessContours.length
+      });
+      const boundaryResult = this.performTessellation(
+        originalContours!,
+        'boundary'
+      );
+      perfLogger.end('Tessellator.boundaryPass');
+
+      if (!boundaryResult) {
+        logger.warn('libtess returned empty result from boundary pass');
+        return { triangles: { vertices: [], indices: [] }, contours: [] };
+      }
+
       tessContours = this.boundaryToContours(boundaryResult);
       if (needsExtrusionContours) {
         extrusionContours = tessContours;
@@ -158,6 +255,38 @@ export class Tessellator {
     }
 
     return contours;
+  }
+
+  private reverseContours(contours: number[][]): number[][] {
+    const reversed: number[][] = new Array(contours.length);
+    for (let i = 0; i < contours.length; i++) {
+      reversed[i] = this.reverseContour(contours[i]);
+    }
+    return reversed;
+  }
+
+  private reverseContour(contour: number[]): number[] {
+    const len = contour.length;
+    if (len === 0) return [];
+
+    const isClosed =
+      len >= 4 &&
+      contour[0] === contour[len - 2] &&
+      contour[1] === contour[len - 1];
+    const end = isClosed ? len - 2 : len;
+    if (end === 0) return [];
+
+    const reversed = new Array(end + 2);
+    let out = 0;
+    for (let i = end - 2; i >= 0; i -= 2) {
+      reversed[out++] = contour[i];
+      reversed[out++] = contour[i + 1];
+    }
+    if (out >= 2) {
+      reversed[out++] = reversed[0];
+      reversed[out++] = reversed[1];
+    }
+    return reversed;
   }
 
   private performTessellation(
