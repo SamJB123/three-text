@@ -1,8 +1,7 @@
-import { Vec2, Vec3 } from '../vectors';
+import { Vec3 } from '../vectors';
 import { perfLogger } from '../../utils/PerformanceLogger';
 import { isLogEnabled } from '../../utils/Logger';
 import {
-  Path,
   GlyphGeometryInfo,
   GlyphContours,
   LoadedFont,
@@ -40,6 +39,14 @@ export interface InstancedTextGeometry {
   };
 }
 
+type GeometryTask = {
+  data: GlyphData;
+  px: number;
+  py: number;
+  pz: number;
+  vertexStart: number;
+};
+
 export class GlyphGeometryBuilder {
   private cache: Cache<string, GlyphData>;
   private tessellator: Tessellator;
@@ -64,6 +71,9 @@ export class GlyphGeometryBuilder {
     }
   >;
   private emptyGlyphs: Set<number> = new Set();
+  private clusterPositions: Vec3[] = [];
+  private clusterContoursScratch: number[][] = [];
+  private taskScratch: GeometryTask[] = [];
 
   constructor(cache: Cache<string, GlyphData>, loadedFont: LoadedFont) {
     this.cache = cache;
@@ -174,15 +184,9 @@ export class GlyphGeometryBuilder {
       perfLogger.start('GlyphGeometryBuilder.buildInstancedGeometry');
     }
 
-    type GeometryTask = {
-      data: GlyphData;
-      px: number;
-      py: number;
-      pz: number;
-      vertexStart: number; // vertex offset (not float offset)
-    };
-
-    const tasks: GeometryTask[] = [];
+    const tasks = this.taskScratch;
+    tasks.length = 0;
+    let taskCount = 0;
     let totalVertexFloats = 0;
     let totalNormalFloats = 0;
     let totalIndexCount = 0;
@@ -195,7 +199,18 @@ export class GlyphGeometryBuilder {
       pz: number
     ): number => {
       const vertexStart = vertexCursor;
-      tasks.push({ data, px, py, pz, vertexStart });
+      let task = tasks[taskCount];
+      if (task) {
+        task.data = data;
+        task.px = px;
+        task.py = py;
+        task.pz = pz;
+        task.vertexStart = vertexStart;
+      } else {
+        task = { data, px, py, pz, vertexStart };
+        tasks[taskCount] = task;
+      }
+      taskCount++;
       totalVertexFloats += data.vertices.length;
       totalNormalFloats += data.normals.length;
       totalIndexCount += data.indices.length;
@@ -251,12 +266,23 @@ export class GlyphGeometryBuilder {
           if (isValid && cached) {
             boundaryGroups = cached.groups;
           } else {
-            const relativePositions = cluster.glyphs.map(
-              (g) => new Vec3(g.x ?? 0, g.y ?? 0, 0)
-            );
+            const glyphCount = cluster.glyphs.length;
+            if (this.clusterPositions.length < glyphCount) {
+              for (let i = this.clusterPositions.length; i < glyphCount; i++) {
+                this.clusterPositions.push(new Vec3(0, 0, 0));
+              }
+            }
+            this.clusterPositions.length = glyphCount;
+            for (let i = 0; i < glyphCount; i++) {
+              const glyph = cluster.glyphs[i];
+              const pos = this.clusterPositions[i];
+              pos.x = glyph.x ?? 0;
+              pos.y = glyph.y ?? 0;
+              pos.z = 0;
+            }
             boundaryGroups = this.clusterer.cluster(
               clusterGlyphContours,
-              relativePositions
+              this.clusterPositions
             );
 
             this.clusteringCache.set(cacheKey, {
@@ -323,7 +349,8 @@ export class GlyphGeometryBuilder {
             let cachedCluster = this.wordCache.get(clusterKey);
 
             if (!cachedCluster) {
-              const clusterPaths: Path[] = [];
+              const clusterContours = this.clusterContoursScratch;
+              let contourIndex = 0;
               const refX = subClusterGlyphs[0].x ?? 0;
               const refY = subClusterGlyphs[0].y ?? 0;
 
@@ -336,16 +363,40 @@ export class GlyphGeometryBuilder {
                 const relY = (glyph.y ?? 0) - refY;
 
                 for (const path of glyphContours.paths) {
-                  clusterPaths.push({
-                    ...path,
-                    points: path.points.map(
-                      (p) => new Vec2(p.x + relX, p.y + relY)
-                    )
-                  });
+                  const points = path.points;
+                  const pointCount = points.length;
+                  if (pointCount < 3) continue;
+
+                  const isClosed =
+                    pointCount > 1 &&
+                    points[0].x === points[pointCount - 1].x &&
+                    points[0].y === points[pointCount - 1].y;
+                  const end = isClosed ? pointCount - 1 : pointCount;
+
+                  const needed = (end + 1) * 2;
+                  let contour = clusterContours[contourIndex];
+                  if (!contour || contour.length < needed) {
+                    contour = new Array(needed);
+                    clusterContours[contourIndex] = contour;
+                  } else {
+                    contour.length = needed;
+                  }
+                  let out = 0;
+                  for (let k = 0; k < end; k++) {
+                    const pt = points[k];
+                    contour[out++] = pt.x + relX;
+                    contour[out++] = pt.y + relY;
+                  }
+                  if (out >= 2) {
+                    contour[out++] = contour[0];
+                    contour[out++] = contour[1];
+                  }
+                  contourIndex++;
                 }
               }
+              clusterContours.length = contourIndex;
               cachedCluster = this.tessellateGlyphCluster(
-                clusterPaths,
+                clusterContours,
                 depth,
                 isCFF
               );
@@ -459,7 +510,7 @@ export class GlyphGeometryBuilder {
         }
       }
     }
-
+    tasks.length = taskCount;
     // Allocate exact-sized buffers and fill once
     const vertexArray = new Float32Array(totalVertexFloats);
     const normalArray = new Float32Array(totalNormalFloats);
@@ -479,21 +530,30 @@ export class GlyphGeometryBuilder {
       const py = task.py;
       const pz = task.pz;
 
-      for (let j = 0; j < v.length; j += 3) {
-        vertexArray[vertexPos++] = (v[j] + px) * scale;
-        vertexArray[vertexPos++] = (v[j + 1] + py) * scale;
-        vertexArray[vertexPos++] = (v[j + 2] + pz) * scale;
+      const offsetX = px * scale;
+      const offsetY = py * scale;
+      const offsetZ = pz * scale;
+      const vLen = v.length;
+      let outPos = vertexPos;
+      for (let j = 0; j < vLen; j += 3) {
+        vertexArray[outPos] = v[j] * scale + offsetX;
+        vertexArray[outPos + 1] = v[j + 1] * scale + offsetY;
+        vertexArray[outPos + 2] = v[j + 2] * scale + offsetZ;
+        outPos += 3;
       }
+      vertexPos = outPos;
 
       normalArray.set(n, normalPos);
       normalPos += n.length;
 
       const vertexStart = task.vertexStart;
-      for (let j = 0; j < idx.length; j++) {
-        indexArray[indexPos++] = idx[j] + vertexStart;
+      const idxLen = idx.length;
+      let outIndexPos = indexPos;
+      for (let j = 0; j < idxLen; j++) {
+        indexArray[outIndexPos++] = idx[j] + vertexStart;
       }
+      indexPos = outIndexPos;
     }
-
     perfLogger.end('GlyphGeometryBuilder.buildInstancedGeometry');
 
     planeBounds.min.x *= scale;
@@ -624,12 +684,12 @@ export class GlyphGeometryBuilder {
   }
 
   private tessellateGlyphCluster(
-    paths: Path[],
+    contours: number[][],
     depth: number,
     isCFF: boolean
   ): GlyphData {
-    const processedGeometry = this.tessellator.process(
-      paths,
+    const processedGeometry = this.tessellator.processContours(
+      contours,
       true,
       isCFF,
       depth !== 0
