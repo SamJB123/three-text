@@ -606,6 +606,33 @@ export class LineBreak {
         } as Glue);
         currentIndex += token.length;
       } else {
+        if (lineWidth && token.includes('-') && !token.includes('\u00AD')) {
+          const tokenWidth = measureText(token);
+          if (tokenWidth > lineWidth) {
+            // Break long hyphenated tokens into characters (break-all behavior)
+            const chars = Array.from(token);
+            for (let i = 0; i < chars.length; i++) {
+              items.push({
+                type: ItemType.BOX,
+                width: measureText(chars[i]),
+                text: chars[i],
+                originIndex: tokenStartIndex + i
+              } as Box);
+
+              if (i < chars.length - 1) {
+                items.push({
+                  type: ItemType.PENALTY,
+                  width: 0,
+                  penalty: 5000,
+                  originIndex: tokenStartIndex + i + 1
+                } as Penalty);
+              }
+            }
+            currentIndex += token.length;
+            continue;
+          }
+        }
+
         const segments = token.split(/(-)/);
         let segmentIndex = tokenStartIndex;
 
