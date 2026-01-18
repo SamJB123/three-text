@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4] - 2026-01-18
+
+### Fixed
+
+- `Extruder`: Fix side walls when contours are not from the boundary pass (regression in 0.4.3)
+- `LineBreak`: Avoid breaking long hyphenated tokens at the hyphen when using break-all behavior
+
 ## [0.4.3] - 2026-01-18
 
 ### Performance
