@@ -126,7 +126,8 @@ export class Tessellator {
         vertices: triangleResult.vertices,
         indices: triangleResult.indices || []
       },
-      contours: extrusionContours
+      contours: extrusionContours,
+      contoursAreBoundary: removeOverlaps
     };
   }
 
@@ -205,7 +206,8 @@ export class Tessellator {
         vertices: triangleResult.vertices,
         indices: triangleResult.indices || []
       },
-      contours: extrusionContours
+      contours: extrusionContours,
+      contoursAreBoundary: removeOverlaps
     };
   }
 

@@ -17,15 +17,16 @@ export class Extruder {
     const points = geometry.triangles.vertices;
     const triangleIndices = geometry.triangles.indices;
     const contours = geometry.contours;
+    const contoursAreBoundary = geometry.contoursAreBoundary === true;
     const pointLen = points.length;
     const numPoints = pointLen / 2;
 
-    // Prefer contours for side walls; fall back to triangle edges
+    // Use boundary contours for side walls when available
     let boundaryEdges: number[] = [];
     let sideEdgeCount = 0;
     let useContours = false;
     if (depth !== 0) {
-      if (contours.length > 0) {
+      if (contoursAreBoundary && contours.length > 0) {
         useContours = true;
         for (const contour of contours) {
           const contourPointCount = contour.length >> 1;

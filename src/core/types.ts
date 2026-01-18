@@ -169,6 +169,7 @@ export interface Triangles {
 export interface ProcessedGeometry {
   triangles: Triangles;
   contours: number[][];
+  contoursAreBoundary?: boolean;
 }
 
 export interface GlyphData {
