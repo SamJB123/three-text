@@ -1,5 +1,3 @@
-// Bector and bounding box types for core
-
 // 2D Vector
 export class Vec2 {
   x: number;

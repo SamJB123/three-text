@@ -36,7 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Vec2 } from '../vectors';
+import { Vec2 } from '../../utils/vectors';
 import { CurveFidelityConfig } from '../types';
 
 export const DEFAULT_CURVE_FIDELITY: CurveFidelityConfig = {

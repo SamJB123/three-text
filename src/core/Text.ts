@@ -31,6 +31,7 @@ import { TextShaper } from './shaping/TextShaper';
 import { globalGlyphCache } from './cache/sharedCaches';
 import { HarfBuzzLoader } from './shaping/HarfBuzzLoader';
 import { TextRangeQuery } from './layout/TextRangeQuery';
+import { loadBinary } from '../utils/loadBinary';
 
 declare global {
   interface Window {
@@ -280,16 +281,7 @@ export class Text {
     await Text.hbInitPromise;
 
     const fontBuffer =
-      typeof fontSrc === 'string'
-        ? await fetch(fontSrc).then((res) => {
-            if (!res.ok) {
-              throw new Error(
-                `Failed to load font from ${fontSrc}: HTTP ${res.status} ${res.statusText}`
-              );
-            }
-            return res.arrayBuffer();
-          })
-        : fontSrc;
+      typeof fontSrc === 'string' ? await loadBinary(fontSrc) : fontSrc;
 
     try {
       if (this.loadedFont) {

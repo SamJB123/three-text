@@ -1,4 +1,4 @@
-import { Vec2 } from '../vectors';
+import { Vec2 } from '../../utils/vectors';
 import { MinHeap } from '../../utils/MinHeap';
 import type { Path } from '../types';
 

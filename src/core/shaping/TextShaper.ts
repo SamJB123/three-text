@@ -1,4 +1,4 @@
-import { Vec3 } from '../vectors';
+import { Vec3 } from '../../utils/vectors';
 import {
   LoadedFont,
   GlyphGeometryInfo,
