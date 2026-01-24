@@ -1,4 +1,5 @@
 import type { HarfBuzzInstance } from '../types';
+import { loadBinary } from '../../utils/loadBinary';
 
 // These will be bundled by Rollup
 // @ts-expect-error - no declarations for harfbuzzjs/hb.js
@@ -8,7 +9,7 @@ import hbjs from 'harfbuzzjs/hbjs.js';
 
 let harfbuzzPromise: Promise<HarfBuzzInstance> | null = null;
 let wasmPath: string | null = null;
-let wasmBuffer: ArrayBuffer | null = null; // Add buffer option
+let wasmBuffer: ArrayBuffer | null = null;
 
 export const HarfBuzzLoader = {
   setWasmPath(path: string): void {
@@ -35,12 +36,7 @@ export const HarfBuzzLoader = {
         if (wasmBuffer) {
           moduleConfig.wasmBinary = wasmBuffer;
         } else if (wasmPath) {
-          moduleConfig.locateFile = (path: string, scriptDirectory: string) => {
-            if (path.endsWith('.wasm')) {
-              return wasmPath!;
-            }
-            return scriptDirectory + path;
-          };
+          moduleConfig.wasmBinary = await loadBinary(wasmPath);
         } else {
           throw new Error(
             'HarfBuzz WASM path or buffer must be set before initialization.'

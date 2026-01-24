@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { Text } from '../src/core/Text';
 import { PathOptimizer } from '../src/core/geometry/PathOptimizer';
-import { Vec2, Vec3 } from '../src/core/vectors';
+import { Vec2, Vec3 } from '../src/utils/vectors';
 import enUs from '../src/hyphenation/en-us';
 
 // Minimal mocks for isolated testing

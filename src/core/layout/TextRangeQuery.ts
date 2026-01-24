@@ -1,5 +1,5 @@
 import { GlyphGeometryInfo, TextRange, TextQueryOptions } from '../types';
-import { Box3 as Box3Core, Vec3 } from '../vectors';
+import { Box3 as Box3Core, Vec3 } from '../../utils/vectors';
 
 export class TextRangeQuery {
   private glyphsByTextIndex = new Map<number, GlyphGeometryInfo[]>();

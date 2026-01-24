@@ -195,6 +195,12 @@ self.onmessage = (e) => {
 
 The library will prioritize the buffer if both a path and a buffer have been set
 
+#### Platform-specific notes
+
+**NW.js with CommonJS:** If using `require()` to load the CJS build in NW.js, use Option 2 (buffer-based loading). NW.js's [dual-context architecture](https://docs.nwjs.io/For%20Users/Advanced/JavaScript%20Contexts%20in%20NW.js/#separate-context-mode) causes path resolution issues in this specific scenario. ESM imports and bundled code work normally
+
+**Electron with `file://` protocol:** If loading HTML directly from the filesystem (not via a dev server), use Option 2 (buffer-based loading) or enable `nodeIntegration` in your BrowserWindow
+
 ### Hyphenation patterns
 
 **For ES Modules (recommended):** Import and register only the languages you need:

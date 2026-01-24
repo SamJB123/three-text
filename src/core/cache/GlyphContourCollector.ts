@@ -1,4 +1,4 @@
-import { Vec2 } from '../vectors';
+import { Vec2 } from '../../utils/vectors';
 import { Path, GlyphContours } from '../types';
 import {
   PathOptimizer,

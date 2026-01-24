@@ -1,6 +1,6 @@
 import type { HyphenationTrieNode } from '../hyphenation';
 import type { CacheStats } from '../utils/Cache';
-import type { Vec2, Vec3, BoundingBox } from './vectors';
+import type { Vec2, Vec3, BoundingBox } from '../utils/vectors';
 export type { HyphenationTrieNode };
 
 export interface Path {
