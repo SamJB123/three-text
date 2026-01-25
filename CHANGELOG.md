@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.5] - 2026-01-26
+
+### Fixed
+
+- HarfBuzz/font loading: complete fetch -> fs fallback for hybrid runtimes and note in README
+
 ## [0.4.4] - 2026-01-18
 
 ### Fixed
