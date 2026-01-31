@@ -24,6 +24,7 @@ import {
 } from '../shaping/DrawCallbacks';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
 import { HarfBuzzGlyph } from '../types';
+import { FontPool } from '../shaping/TextShaper';
 import { Cache } from '../../utils/Cache';
 import { DEFAULT_CURVE_FIDELITY } from '../geometry/Polygonizer';
 import { DEFAULT_OPTIMIZATION_CONFIG } from '../geometry/PathOptimizer';
@@ -74,6 +75,8 @@ export class GlyphGeometryBuilder {
   private clusterPositions: Vec3[] = [];
   private clusterContoursScratch: number[][] = [];
   private taskScratch: GeometryTask[] = [];
+  private fontPool?: FontPool;
+  private variationRanges?: Array<{ start: number; end: number; key: string }>;
 
   constructor(cache: Cache<string, GlyphData>, loadedFont: LoadedFont) {
     this.cache = cache;
@@ -91,6 +94,42 @@ export class GlyphGeometryBuilder {
 
   public getOptimizationStats() {
     return this.collector.getOptimizationStats();
+  }
+
+  public setFontPool(fontPool: FontPool, variationRanges: Array<{ start: number; end: number; key: string }>): void {
+    this.fontPool = fontPool;
+    this.variationRanges = variationRanges;
+    console.log('[GlyphGeometryBuilder] setFontPool called, variationRanges:', variationRanges);
+  }
+
+  public clearFontPool(): void {
+    this.fontPool = undefined;
+    this.variationRanges = undefined;
+  }
+
+  private getFontForGlyph(glyph: HarfBuzzGlyph): LoadedFont {
+    // If we have fontPool and variation ranges, check if glyph falls within any range
+    // IMPORTANT: Later ranges override earlier ones (same as variationIndexMap in shaper)
+    if (this.fontPool) {
+      if (this.variationRanges) {
+        let matchedKey: string | null = null;
+        // Iterate through ALL ranges, later matches override earlier ones
+        for (const range of this.variationRanges) {
+          if (glyph.absoluteTextIndex >= range.start && glyph.absoluteTextIndex < range.end) {
+            matchedKey = range.key;
+          }
+        }
+        if (matchedKey) {
+          const varFont = this.fontPool.variationFonts.get(matchedKey);
+          if (varFont) {
+            return varFont;
+          }
+        }
+      }
+      return this.fontPool.defaultFont;
+    }
+    // Fallback only when no fontPool (non-variation path)
+    return this.loadedFont;
   }
 
   public setCurveFidelityConfig(config?: CurveFidelityConfig): void {
@@ -233,17 +272,22 @@ export class GlyphGeometryBuilder {
 
         const clusterGlyphContours: GlyphContours[] = [];
         for (const glyph of cluster.glyphs) {
-          clusterGlyphContours.push(this.getContoursForGlyph(glyph.g));
+          const font = this.getFontForGlyph(glyph);
+          clusterGlyphContours.push(this.getContoursForGlyph(glyph.g, font));
         }
 
         let boundaryGroups: number[][];
         if (cluster.glyphs.length <= 1) {
           boundaryGroups = [[0]];
         } else {
-          // Check clustering cache (same text + glyph IDs + positions = same overlap groups)
-          // Key must be font-specific; glyph ids/bounds differ between fonts
+          // Check clustering cache (same text + glyph IDs + positions + fonts = same overlap groups)
+          // Key must include font info for each glyph since bounds differ between font variations
           // Positions must match since overlap detection depends on relative glyph placement
-          const cacheKey = `${this.cacheKeyPrefix}_${cluster.text}`;
+          const fontSig = cluster.glyphs.map(g => {
+            const f = this.getFontForGlyph(g);
+            return f.fontVariations ? Object.keys(f.fontVariations).sort().map(k => `${k}:${f.fontVariations![k]}`).join(',') : 'default';
+          }).join('|');
+          const cacheKey = `${this.cacheKeyPrefix}_${cluster.text}_${fontSig}`;
           const cached = this.clusteringCache.get(cacheKey);
 
           let isValid = false;
@@ -466,12 +510,12 @@ export class GlyphGeometryBuilder {
                 continue;
               }
 
-              const glyphCacheKey = getGlyphCacheKey(
-                this.cacheKeyPrefix,
-                glyph.g,
-                depth,
-                removeOverlaps
-              );
+              // Include font variation in cache key to prevent cross-contamination
+              const font = this.getFontForGlyph(glyph);
+              const varSig = font.fontVariations
+                ? Object.keys(font.fontVariations).sort().map(k => `${k}:${font.fontVariations![k]}`).join(',')
+                : 'default';
+              const glyphCacheKey = `${this.cacheKeyPrefix}_${glyph.g}_${depth}_${removeOverlaps}_${varSig}`;
               let cachedGlyph = this.cache.get(glyphCacheKey);
 
               if (!cachedGlyph) {
@@ -594,7 +638,12 @@ export class GlyphGeometryBuilder {
     const parts = glyphs.map((g) => {
       const relX = (g.x ?? 0) - refX;
       const relY = (g.y ?? 0) - refY;
-      return `${g.g}:${relX},${relY}`;
+      // Include font variation signature to prevent cross-contamination
+      const font = this.getFontForGlyph(g);
+      const varSig = font.fontVariations
+        ? Object.keys(font.fontVariations).sort().map(k => `${k}:${font.fontVariations![k]}`).join(',')
+        : 'default';
+      return `${g.g}:${relX},${relY}:${varSig}`;
     });
 
     const ids = parts.join('|');
@@ -632,7 +681,9 @@ export class GlyphGeometryBuilder {
     };
   }
 
-  private getContoursForGlyph(glyphId: number): GlyphContours {
+  private getContoursForGlyph(glyphId: number, font?: LoadedFont): GlyphContours {
+    const targetFont = font || this.loadedFont;
+
     // Fast path: skip HarfBuzz draw for known-empty glyphs (spaces, zero-width, etc)
     if (this.emptyGlyphs.has(glyphId)) {
       return {
@@ -645,7 +696,18 @@ export class GlyphGeometryBuilder {
       };
     }
 
-    const key = `${this.cacheKeyPrefix}_${glyphId}`;
+    // Use font pointer + variations for cache key to distinguish different font variations
+    // Include variation signature for robustness against pointer reuse
+    let fontKey: string;
+    if (font) {
+      const varSig = targetFont.fontVariations
+        ? Object.keys(targetFont.fontVariations).sort().map(k => `${k}:${targetFont.fontVariations![k]}`).join(',')
+        : '';
+      fontKey = `fptr_${targetFont.font.ptr}_${varSig}`;
+    } else {
+      fontKey = this.cacheKeyPrefix;
+    }
+    const key = `${fontKey}_${glyphId}`;
     const cached = this.contourCache.get(key);
     if (cached) {
       return cached;
@@ -656,8 +718,8 @@ export class GlyphGeometryBuilder {
 
     this.collector.reset();
     this.collector.beginGlyph(glyphId, 0);
-    this.loadedFont.module.exports.hb_font_draw_glyph(
-      this.loadedFont.font.ptr,
+    targetFont.module.exports.hb_font_draw_glyph(
+      targetFont.font.ptr,
       glyphId,
       this.drawCallbacks.getDrawFuncsPtr(),
       0

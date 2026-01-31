@@ -31,6 +31,8 @@ export type {
   ColorOptions,
   ColorByRange,
   ColoredRange,
+  FontVariationByRange,
+  FontVariationsOptions,
   PathInfo,
   HyphenationPatternsMap,
   CurveFidelityConfig,

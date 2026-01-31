@@ -25,6 +25,7 @@ export interface HarfBuzzGlyph {
   y?: number; // relative y position within word
   lineIndex: number;
   absoluteTextIndex: number;
+  font?: LoadedFont; // font used to shape this glyph (for multi-variation support)
 }
 
 export interface GlyphCluster {
@@ -275,6 +276,18 @@ export interface ColoredRange {
   lineIndices: number[];
 }
 
+// Per-character font variation support (parallel to ColorByRange)
+export interface FontVariationByRange {
+  start: number;
+  end: number;
+  variations: { [key: string]: number };
+}
+
+export interface FontVariationsOptions {
+  default?: { [key: string]: number };
+  byCharRange?: FontVariationByRange[];
+}
+
 export interface TextOptions {
   text: string;
   font: string | ArrayBuffer;
@@ -283,7 +296,7 @@ export interface TextOptions {
   lineHeight?: number;
   letterSpacing?: number;
   perGlyphAttributes?: boolean;
-  fontVariations?: { [key: string]: number };
+  fontVariations?: { [key: string]: number } | FontVariationsOptions;
   fontFeatures?: { [tag: string]: boolean | number };
   maxTextLength?: number;
   removeOverlaps?: boolean;

@@ -17,7 +17,9 @@ import type {
   HarfBuzzInstance,
   ColorOptions,
   ColoredRange,
-  TextQueryOptions
+  TextQueryOptions,
+  FontVariationsOptions,
+  FontVariationByRange
 } from './types';
 import { perfLogger } from '../utils/PerformanceLogger';
 import { logger } from '../utils/Logger';
@@ -27,7 +29,7 @@ import { TextMeasurer } from './shaping/TextMeasurer';
 import { loadPattern } from '../hyphenation/HyphenationPatternLoader';
 import type { HyphenationTrieNode } from '../hyphenation';
 import { GlyphGeometryBuilder } from './cache/GlyphGeometryBuilder';
-import { TextShaper } from './shaping/TextShaper';
+import { TextShaper, FontPool, VariationIndexMap } from './shaping/TextShaper';
 import { globalGlyphCache } from './cache/sharedCaches';
 import { HarfBuzzLoader } from './shaping/HarfBuzzLoader';
 import { TextRangeQuery } from './layout/TextRangeQuery';
@@ -57,6 +59,65 @@ export class Text {
       result += keys[i] + ':' + obj[keys[i]];
     }
     return result;
+  }
+
+  // Check if fontVariations is the extended byCharRange format
+  private static isFontVariationsOptions(
+    value: { [key: string]: number } | FontVariationsOptions | undefined
+  ): value is FontVariationsOptions {
+    if (!value) return false;
+    return 'byCharRange' in value || 'default' in value;
+  }
+
+  // Get default variations from options (handles both formats)
+  private static getDefaultVariations(
+    fontVariations?: { [key: string]: number } | FontVariationsOptions
+  ): { [key: string]: number } | undefined {
+    if (!fontVariations) return undefined;
+    if (Text.isFontVariationsOptions(fontVariations)) {
+      return fontVariations.default;
+    }
+    return fontVariations;
+  }
+
+  // Build variation index map from byCharRange
+  private static buildVariationIndexMap(
+    ranges: FontVariationByRange[]
+  ): VariationIndexMap {
+    const map: VariationIndexMap = new Map();
+    for (const range of ranges) {
+      const key = Text.stableStringify(range.variations);
+      for (let i = range.start; i < range.end; i++) {
+        map.set(i, key);
+      }
+    }
+    return map;
+  }
+
+  // Get unique variation keys from ranges
+  private static getUniqueVariationKeys(
+    ranges: FontVariationByRange[]
+  ): Map<string, { [key: string]: number }> {
+    const unique = new Map<string, { [key: string]: number }>();
+    for (const range of ranges) {
+      const key = Text.stableStringify(range.variations);
+      if (!unique.has(key)) {
+        unique.set(key, range.variations);
+      }
+    }
+    return unique;
+  }
+
+  // Build font cache key for a specific variation
+  private buildVariationFontKey(
+    font: string | ArrayBuffer,
+    variations: { [key: string]: number }
+  ): string {
+    const baseFontKey =
+      typeof font === 'string'
+        ? font
+        : `buffer-${Text.generateFontContentHash(font)}`;
+    return `${baseFontKey}_var_${Text.stableStringify(variations)}`;
   }
 
   private fontLoader: FontLoader;
@@ -167,9 +228,12 @@ export class Text {
         ? options.font
         : `buffer-${Text.generateFontContentHash(options.font)}`;
 
+    // For byCharRange, use default variations for the base font
+    const defaultVariations = Text.getDefaultVariations(options.fontVariations);
+
     let fontKey = baseFontKey;
-    if (options.fontVariations) {
-      fontKey += `_var_${Text.stableStringify(options.fontVariations)}`;
+    if (defaultVariations) {
+      fontKey += `_var_${Text.stableStringify(defaultVariations)}`;
     }
     if (options.fontFeatures) {
       fontKey += `_feat_${Text.stableStringify(options.fontFeatures)}`;
@@ -180,7 +244,7 @@ export class Text {
       loadedFont = await Text.loadAndCacheFont(
         fontKey,
         options.font!,
-        options.fontVariations,
+        defaultVariations,
         options.fontFeatures
       );
     }
@@ -365,6 +429,62 @@ export class Text {
         );
       }
 
+      // Handle per-character font variations (byCharRange)
+      let variationIndexMap: VariationIndexMap | undefined;
+      let fontPool: FontPool | undefined;
+
+      if (
+        Text.isFontVariationsOptions(options.fontVariations) &&
+        options.fontVariations.byCharRange &&
+        options.fontVariations.byCharRange.length > 0
+      ) {
+        const ranges = options.fontVariations.byCharRange;
+        console.log('[three-text:Text] byCharRange path ENTERED, ranges:', ranges);
+        variationIndexMap = Text.buildVariationIndexMap(ranges);
+        console.log('[three-text:Text] variationIndexMap size:', variationIndexMap.size);
+
+        // Build font pool with all needed variation fonts
+        const uniqueVariations = Text.getUniqueVariationKeys(ranges);
+        console.log('[three-text:Text] uniqueVariations keys:', [...uniqueVariations.keys()]);
+        const variationFonts = new Map<string, LoadedFont>();
+
+        for (const [key, variations] of uniqueVariations) {
+          // Check if we already have this font cached
+          const fontKey = this.buildVariationFontKey(options.font, variations);
+          let varFont = Text.fontCache.get(fontKey);
+
+          if (!varFont) {
+            varFont = await Text.loadAndCacheFont(
+              fontKey,
+              options.font,
+              variations,
+              options.fontFeatures
+            );
+            console.log('[three-text:Text] Loaded NEW variation font, key:', key, 'ptr:', varFont.font.ptr, 'variations:', varFont.fontVariations);
+          } else {
+            console.log('[three-text:Text] Using CACHED variation font, key:', key, 'ptr:', varFont.font.ptr);
+          }
+          variationFonts.set(key, varFont);
+        }
+
+        fontPool = {
+          defaultFont: this.loadedFont,
+          variationFonts
+        };
+        console.log('[three-text:Text] fontPool created, defaultFont ptr:', this.loadedFont.font.ptr, 'variationFonts count:', variationFonts.size);
+
+        this.textShaper.setFontPool(fontPool);
+        // Build variation ranges with keys for geometry builder (same pattern as color byCharRange)
+        const variationRangesWithKeys = ranges.map(range => ({
+          start: range.start,
+          end: range.end,
+          key: Text.stableStringify(range.variations)
+        }));
+        this.geometryBuilder!.setFontPool(fontPool, variationRangesWithKeys);
+      } else {
+        this.geometryBuilder!.clearFontPool();
+      }
+
       const layoutData = this.prepareLayout(options);
 
       // Auto-detect: variable fonts need overlap removal, static fonts can use fast path
@@ -379,7 +499,8 @@ export class Text {
         layoutData.align,
         layoutData.direction,
         options.color,
-        options.text
+        options.text,
+        variationIndexMap
       );
 
       // Pre-compute which character indices will be colored. This allows geometry building
@@ -511,13 +632,17 @@ export class Text {
   }
 
   private updateFontVariations(options: TextOptions): void {
-    if (options.fontVariations && this.loadedFont) {
+    // For byCharRange variations, the default font uses default variations
+    // Individual variation fonts are loaded separately
+    const defaultVariations = Text.getDefaultVariations(options.fontVariations);
+
+    if (defaultVariations && this.loadedFont) {
       if (
-        Text.stableStringify(options.fontVariations) !==
+        Text.stableStringify(defaultVariations) !==
         Text.stableStringify(this.loadedFont.fontVariations || {})
       ) {
-        this.loadedFont.font.setVariations(options.fontVariations);
-        this.loadedFont.fontVariations = options.fontVariations;
+        this.loadedFont.font.setVariations(defaultVariations);
+        this.loadedFont.fontVariations = defaultVariations;
       }
     }
   }
