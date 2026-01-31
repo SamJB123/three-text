@@ -44,7 +44,8 @@ export class TextShaper {
   private loadedFont: LoadedFont;
   private fontPool?: FontPool;
   private geometryBuilder: GlyphGeometryBuilder;
-  private cachedSpaceWidth: Map<number, number> = new Map();
+  // Key includes letterSpacing + font variation signature to prevent cross-contamination
+  private cachedSpaceWidth: Map<string, number> = new Map();
 
   constructor(loadedFont: LoadedFont, geometryBuilder: GlyphGeometryBuilder) {
     this.loadedFont = loadedFont;
@@ -537,14 +538,19 @@ export class TextShaper {
       align === 'justify' &&
       !lineInfo.isLastLine
     ) {
-      let naturalSpaceWidth = this.cachedSpaceWidth.get(letterSpacing);
+      // Include font variation in cache key to prevent cross-contamination
+      const varSig = this.loadedFont.fontVariations
+        ? Object.keys(this.loadedFont.fontVariations).sort().map(k => `${k}:${this.loadedFont.fontVariations![k]}`).join(',')
+        : 'default';
+      const cacheKey = `${letterSpacing}_${varSig}`;
+      let naturalSpaceWidth = this.cachedSpaceWidth.get(cacheKey);
       if (naturalSpaceWidth === undefined) {
         naturalSpaceWidth = TextMeasurer.measureTextWidth(
           this.loadedFont,
           ' ',
           letterSpacing
         );
-        this.cachedSpaceWidth.set(letterSpacing, naturalSpaceWidth);
+        this.cachedSpaceWidth.set(cacheKey, naturalSpaceWidth);
       }
 
       const width = naturalSpaceWidth!;

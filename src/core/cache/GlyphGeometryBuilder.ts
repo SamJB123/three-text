@@ -71,7 +71,8 @@ export class GlyphGeometryBuilder {
       groups: number[][];
     }
   >;
-  private emptyGlyphs: Set<number> = new Set();
+  // Key includes font variation to prevent cross-contamination: "glyphId_varSig"
+  private emptyGlyphs: Set<string> = new Set();
   private clusterPositions: Vec3[] = [];
   private clusterContoursScratch: number[][] = [];
   private taskScratch: GeometryTask[] = [];
@@ -684,8 +685,15 @@ export class GlyphGeometryBuilder {
   private getContoursForGlyph(glyphId: number, font?: LoadedFont): GlyphContours {
     const targetFont = font || this.loadedFont;
 
+    // Build variation signature for cache keys
+    const varSig = targetFont.fontVariations
+      ? Object.keys(targetFont.fontVariations).sort().map(k => `${k}:${targetFont.fontVariations![k]}`).join(',')
+      : 'default';
+
     // Fast path: skip HarfBuzz draw for known-empty glyphs (spaces, zero-width, etc)
-    if (this.emptyGlyphs.has(glyphId)) {
+    // Key includes font variation to prevent cross-contamination
+    const emptyKey = `${glyphId}_${varSig}`;
+    if (this.emptyGlyphs.has(emptyKey)) {
       return {
         glyphId,
         paths: [],
@@ -697,12 +705,8 @@ export class GlyphGeometryBuilder {
     }
 
     // Use font pointer + variations for cache key to distinguish different font variations
-    // Include variation signature for robustness against pointer reuse
     let fontKey: string;
     if (font) {
-      const varSig = targetFont.fontVariations
-        ? Object.keys(targetFont.fontVariations).sort().map(k => `${k}:${targetFont.fontVariations![k]}`).join(',')
-        : '';
       fontKey = `fptr_${targetFont.font.ptr}_${varSig}`;
     } else {
       fontKey = this.cacheKeyPrefix;
@@ -736,9 +740,9 @@ export class GlyphGeometryBuilder {
       }
     };
 
-    // Mark glyph as empty for future fast-path
+    // Mark glyph as empty for future fast-path (includes font variation in key)
     if (contours.paths.length === 0) {
-      this.emptyGlyphs.add(glyphId);
+      this.emptyGlyphs.add(emptyKey);
     }
 
     this.contourCache.set(key, contours);
